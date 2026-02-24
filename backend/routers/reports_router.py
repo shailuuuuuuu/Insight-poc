@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from database import get_db
-from models import User, Student, TestSession, Score
+from models import User, Student, TestSession, Score, Group, group_students
 from schemas import RiskSummary, StudentRiskRow
 from auth import get_current_user
 
@@ -303,3 +303,141 @@ def student_progress(
                 "risk_level": score.risk_level,
             })
     return data_points
+
+
+@router.get("/testing-queue")
+def testing_queue(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from sqlalchemy import func, case, and_
+    from models import user_students
+    import datetime
+
+    student_ids = [r[0] for r in db.query(user_students.c.student_id).filter(
+        user_students.c.user_id == current_user.id
+    ).all()]
+    if not student_ids:
+        return []
+
+    students = db.query(Student).filter(Student.id.in_(student_ids), Student.status == "active").all()
+
+    results = []
+    now = datetime.datetime.utcnow()
+    for s in students:
+        latest = db.query(TestSession).filter(
+            TestSession.student_id == s.id, TestSession.is_complete == True
+        ).order_by(TestSession.completed_at.desc()).first()
+
+        days_since = (now - latest.completed_at).days if latest and latest.completed_at else 999
+        latest_risk = "unknown"
+        if latest:
+            score = db.query(Score).filter(Score.test_session_id == latest.id, Score.sub_target.is_(None)).first()
+            if score:
+                latest_risk = score.risk_level or "unknown"
+
+        priority = 0
+        if days_since > 90:
+            priority += 3
+        elif days_since > 60:
+            priority += 2
+        elif days_since > 30:
+            priority += 1
+        if latest_risk == "high":
+            priority += 3
+        elif latest_risk == "moderate":
+            priority += 1
+
+        results.append({
+            "student_id": s.id,
+            "name": f"{s.first_name} {s.last_name}",
+            "grade": s.grade,
+            "school": s.school,
+            "days_since_last": days_since,
+            "latest_risk": latest_risk,
+            "priority": priority,
+        })
+
+    results.sort(key=lambda x: -x["priority"])
+    return results[:20]
+
+
+@router.get("/completion-stats")
+def completion_stats(
+    academic_year: str = Query("2025-2026"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from models import user_students
+    student_ids = [r[0] for r in db.query(user_students.c.student_id).filter(
+        user_students.c.user_id == current_user.id
+    ).all()]
+    if not student_ids:
+        return []
+
+    students = db.query(Student).filter(Student.id.in_(student_ids), Student.status == "active").all()
+    grade_map = {}
+    for s in students:
+        grade_map.setdefault(s.grade, {"total": 0, "tested": 0})
+        grade_map[s.grade]["total"] += 1
+        has_test = db.query(TestSession).filter(
+            TestSession.student_id == s.id,
+            TestSession.academic_year == academic_year,
+            TestSession.is_complete == True,
+        ).first()
+        if has_test:
+            grade_map[s.grade]["tested"] += 1
+
+    return [{"grade": g, **v} for g, v in sorted(grade_map.items())]
+
+
+@router.get("/risk-heatmap")
+def risk_heatmap(
+    academic_year: str = Query("2025-2026"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from models import user_students
+    student_ids = [r[0] for r in db.query(user_students.c.student_id).filter(
+        user_students.c.user_id == current_user.id
+    ).all()]
+
+    grades = ["K", "1", "2", "3", "4", "5", "6", "7", "8"]
+    subtests = ["NLM_READING", "NLM_LISTENING", "DDM_PA", "DDM_PM", "DDM_OM", "DDM_DI"]
+
+    results = []
+    for grade in grades:
+        for subtest in subtests:
+            grade_students = db.query(Student).filter(
+                Student.id.in_(student_ids), Student.grade == grade, Student.status == "active"
+            ).all()
+            if not grade_students:
+                continue
+
+            gs_ids = [s.id for s in grade_students]
+            sessions = db.query(TestSession).filter(
+                TestSession.student_id.in_(gs_ids),
+                TestSession.subtest == subtest,
+                TestSession.academic_year == academic_year,
+                TestSession.is_complete == True,
+            ).all()
+
+            total_scored = 0
+            high_count = 0
+            for sess in sessions:
+                scores = db.query(Score).filter(
+                    Score.test_session_id == sess.id, Score.sub_target.is_(None)
+                ).all()
+                for sc in scores:
+                    total_scored += 1
+                    if sc.risk_level == "high":
+                        high_count += 1
+
+            if total_scored > 0:
+                results.append({
+                    "grade": grade,
+                    "subtest": subtest,
+                    "high_pct": round(high_count / total_scored * 100, 1),
+                    "count": total_scored,
+                })
+    return results

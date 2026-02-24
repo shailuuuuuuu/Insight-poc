@@ -17,3 +17,46 @@
   --color-risk-benchmark: #22c55e;
   --color-risk-advanced: #3b82f6;
 }
+
+/* High contrast mode */
+.high-contrast {
+  --color-primary-50: #fff;
+  --color-primary-100: #e0e0e0;
+  --color-primary-200: #c0c0c0;
+  --color-primary-600: #000;
+  --color-primary-700: #000;
+  --color-primary-800: #000;
+}
+
+.high-contrast * {
+  border-color: #000 !important;
+}
+
+.high-contrast .bg-white {
+  background-color: #fff !important;
+}
+
+.high-contrast .text-gray-400,
+.high-contrast .text-gray-500 {
+  color: #333 !important;
+}
+
+/* Focus ring for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* Print styles for PDF export */
+@media print {
+  aside, header, .no-print, button {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .print-full {
+    width: 100% !important;
+  }
+}

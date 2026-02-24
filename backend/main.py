@@ -8,6 +8,19 @@ from routers.reports_router import router as reports_router
 from routers.users_router import router as users_router
 from routers.licenses_router import router as licenses_router
 from data.stimulus_api import router as stimulus_router
+from routers.notifications_router import router as notifications_router
+from routers.mtss_router import router as mtss_router
+from routers.interventions_router import router as interventions_router
+from routers.pd_router import router as pd_router
+from routers.pathways_router import router as pathways_router
+from routers.executive_router import router as executive_router
+from routers.test_builder_router import router as test_builder_router
+from routers.workspaces_router import router as workspaces_router
+from routers.gamification_router import router as gamification_router
+from routers.sel_router import router as sel_router
+from routers.predictions_router import router as predictions_router
+from routers.assistant_router import router as assistant_router
+from routers.parent_router import router as parent_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -28,6 +41,19 @@ app.include_router(reports_router)
 app.include_router(users_router)
 app.include_router(licenses_router)
 app.include_router(stimulus_router)
+app.include_router(notifications_router)
+app.include_router(mtss_router)
+app.include_router(interventions_router)
+app.include_router(pd_router)
+app.include_router(pathways_router)
+app.include_router(executive_router)
+app.include_router(test_builder_router)
+app.include_router(workspaces_router)
+app.include_router(gamification_router)
+app.include_router(sel_router)
+app.include_router(predictions_router)
+app.include_router(assistant_router)
+app.include_router(parent_router)
 
 
 @app.get("/api/health")

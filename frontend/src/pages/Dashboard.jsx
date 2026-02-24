@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { Users, ClipboardList, AlertTriangle, TrendingUp, ChevronRight, ExternalLink } from 'lucide-react';
+import { Users, ClipboardList, AlertTriangle, TrendingUp, ChevronRight, ExternalLink, Play } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import RiskHeatmap from '../components/RiskHeatmap';
+import CompletionTracker from '../components/CompletionTracker';
 
 const RISK_COLORS = { benchmark: '#22c55e', moderate: '#f59e0b', high: '#ef4444' };
 const RISK_KEYS = { Benchmark: 'benchmark', Moderate: 'moderate', High: 'high' };
@@ -14,12 +16,18 @@ export default function Dashboard() {
   const [myStudents, setMyStudents] = useState([]);
   const [riskData, setRiskData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [heatmapData, setHeatmapData] = useState([]);
+  const [queueData, setQueueData] = useState([]);
+  const [completionData, setCompletionData] = useState([]);
 
   useEffect(() => {
-    Promise.all([api.getMyStudents(), api.riskSummary()])
-      .then(([students, risk]) => {
+    Promise.all([api.getMyStudents(), api.riskSummary(), api.riskHeatmap(), api.testingQueue(), api.completionStats()])
+      .then(([students, risk, heatmap, queue, completion]) => {
         setMyStudents(students);
         setRiskData(risk);
+        setHeatmapData(heatmap);
+        setQueueData(queue);
+        setCompletionData(completion);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -266,6 +274,51 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Risk Heatmap */}
+      {heatmapData.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Risk Heatmap (Grade × Subtest)</h2>
+          <RiskHeatmap data={heatmapData} onCellClick={(grade, subtest) => navigate(`/reports?tab=table&riskFilter=${subtest}:high`)} />
+        </div>
+      )}
+
+      {/* Testing Queue & Completion Tracker */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Testing Queue */}
+        {queueData.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Today&apos;s Testing Queue</h2>
+              <span className="text-xs text-gray-400">Priority-sorted</span>
+            </div>
+            <div className="space-y-2">
+              {queueData.slice(0, 8).map((s) => (
+                <div key={s.student_id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${s.latest_risk === 'high' ? 'bg-red-500' : s.latest_risk === 'moderate' ? 'bg-amber-500' : 'bg-green-500'}`} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{s.name}</p>
+                      <p className="text-xs text-gray-400">Grade {s.grade} · {s.days_since_last}d since last test</p>
+                    </div>
+                  </div>
+                  <button onClick={() => navigate('/assess')} className="flex items-center gap-1 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-lg text-xs font-medium hover:bg-primary-100 flex-shrink-0">
+                    <Play className="w-3 h-3" /> Assess
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Completion Tracker */}
+        {completionData.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Assessment Completion by Grade</h2>
+            <CompletionTracker data={completionData} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

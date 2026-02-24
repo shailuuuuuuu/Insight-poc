@@ -27,6 +27,13 @@ from database import engine, SessionLocal, Base
 from models import (
     Organization, User, Student, Group, License,
     TestSession, Score, user_students, group_students,
+    Notification, InterventionLog, Intervention, InterventionAssignment,
+    PDCourse, PDModule, PDProgress,
+    StudentPathway, PathwayActivity,
+    TestItem, CustomTest, custom_test_items,
+    Workspace, WorkspaceNote, WorkspaceActionItem, workspace_members,
+    Badge, StudentBadge, ReadingStreak,
+    SELScreening, parent_students,
 )
 from auth import hash_password
 from services.scoring import classify_risk
@@ -547,9 +554,363 @@ def _seed(db):
     print("  License usage updated.")
 
     # ------------------------------------------------------------------
-    # 8. Generate CSV test file for bulk import coverage
+    # 8. Seed new feature tables (Notifications, Interventions, PD, Badges, SEL, etc.)
     # ------------------------------------------------------------------
-    print("\n[8/8] Generating sample CSV for bulk-import testing...")
+    print("\n[8/16] Seeding notifications...")
+    notification_types = [
+        ("untested", "Students Need Assessment", "You have {n} students who haven't been assessed this window.", "/students"),
+        ("risk_change", "Risk Level Changed", "{name} moved from benchmark to moderate risk on NLM Reading.", "/students/{sid}"),
+        ("license", "License Usage Warning", "Your organization has used {pct}% of available licenses.", "/licenses"),
+        ("benchmark_deadline", "Benchmark Window Closing", "The {toy} benchmark window closes in {days} days.", "/assess"),
+        ("completion", "Assessment Completed", "Assessment for {name} has been completed successfully.", "/students/{sid}"),
+        ("digest", "Weekly Summary", "This week: {n} assessments completed, {m} students flagged.", "/reports"),
+    ]
+    notif_count = 0
+    for user in all_users[:50]:
+        n_notifs = random.randint(5, 15)
+        for _ in range(n_notifs):
+            ntype, title, msg, link = random.choice(notification_types)
+            msg = msg.format(n=random.randint(3, 20), name=random.choice(FIRST_NAMES),
+                            pct=random.randint(60, 95), toy=random.choice(TIMES_OF_YEAR),
+                            days=random.randint(3, 14), m=random.randint(1, 5),
+                            sid=random.randint(1, 100))
+            link = link.format(sid=random.randint(1, 100))
+            notif = Notification(
+                user_id=user.id, type=ntype, title=title, message=msg,
+                link=link, is_read=random.random() < 0.4,
+                created_at=datetime.datetime.utcnow() - datetime.timedelta(hours=random.randint(1, 720)),
+            )
+            db.add(notif)
+            notif_count += 1
+    for _ in range(30):
+        ntype, title, msg, link = random.choice(notification_types)
+        msg = msg.format(n=random.randint(3, 20), name=random.choice(FIRST_NAMES),
+                        pct=random.randint(60, 95), toy=random.choice(TIMES_OF_YEAR),
+                        days=random.randint(3, 14), m=random.randint(1, 5), sid=random.randint(1, 100))
+        link = link.format(sid=random.randint(1, 100))
+        db.add(Notification(
+            user_id=demo_user.id, type=ntype, title=title, message=msg,
+            link=link, is_read=random.random() < 0.3,
+            created_at=datetime.datetime.utcnow() - datetime.timedelta(hours=random.randint(1, 720)),
+        ))
+        notif_count += 1
+    db.commit()
+    print(f"  Created {notif_count} notifications.")
+
+    # ------------------------------------------------------------------
+    print("\n[9/16] Seeding intervention library (200+ activities)...")
+    SKILL_AREAS = ["phonemic_awareness", "phonics", "fluency", "vocabulary", "comprehension"]
+    EVIDENCE_LEVELS = ["strong", "moderate", "emerging"]
+    INTERVENTION_TEMPLATES = {
+        "phonemic_awareness": [
+            ("Sound Sorting", "Sort picture cards by initial sounds"),
+            ("Phoneme Segmentation Practice", "Break words into individual sounds using counters"),
+            ("Blending Blocks", "Use colored blocks to blend sounds into words"),
+            ("Rhyme Time", "Identify and produce rhyming words"),
+            ("Sound Deletion Game", "Say a word without a specified sound"),
+            ("Phoneme Bingo", "Mark bingo cards matching heard phonemes"),
+            ("Elkonin Boxes", "Push tokens into boxes for each sound in a word"),
+            ("Sound Matching Cards", "Match cards with the same beginning/ending sounds"),
+        ],
+        "phonics": [
+            ("Letter-Sound Flashcards", "Practice letter-sound correspondence with flashcards"),
+            ("Word Building with Tiles", "Build CVC words using magnetic letter tiles"),
+            ("Decodable Text Reading", "Read controlled texts focusing on target patterns"),
+            ("Word Family Wheels", "Spin wheels to create word family words"),
+            ("Syllable Division Practice", "Divide multisyllabic words using syllable types"),
+            ("Spelling Dictation", "Write words from dictation focusing on target patterns"),
+            ("Sound Spelling Mapping", "Map sounds to spellings in words"),
+            ("Vowel Team Practice", "Sort and read words with vowel teams"),
+        ],
+        "fluency": [
+            ("Repeated Reading", "Read the same passage 3-4 times to build speed and accuracy"),
+            ("Partner Reading", "Read alternating paragraphs with a partner"),
+            ("Timed Reading Sprints", "One-minute timed readings with progress charting"),
+            ("Echo Reading", "Listen to a model reader then echo the same passage"),
+            ("Reader's Theater", "Practice a script for fluent oral presentation"),
+            ("Phrase-Cued Reading", "Read text marked with phrase boundaries"),
+            ("Choral Reading", "Read aloud together in unison"),
+            ("Prosody Practice", "Practice reading with expression using marked texts"),
+        ],
+        "vocabulary": [
+            ("Word Map Activity", "Create semantic maps for new vocabulary words"),
+            ("Context Clue Detective", "Use surrounding text to determine word meanings"),
+            ("Vocabulary Journal", "Record new words with definitions, sentences, and pictures"),
+            ("Word Relationships Sort", "Sort words by synonyms, antonyms, or categories"),
+            ("Morpheme Analysis", "Break words into prefixes, roots, and suffixes"),
+            ("Vocabulary Games", "Play matching and memory games with vocabulary cards"),
+            ("Academic Language Practice", "Practice using Tier 2 words in sentences"),
+            ("Word of the Day", "Explore a new word daily with multiple exposures"),
+        ],
+        "comprehension": [
+            ("Story Retell with Props", "Retell stories using picture cards or props"),
+            ("Question Generation", "Students create questions about a text"),
+            ("Graphic Organizer Work", "Use graphic organizers to map story elements"),
+            ("Think-Aloud Modeling", "Teacher models thinking processes during reading"),
+            ("Reciprocal Teaching", "Students take turns as teacher using 4 strategies"),
+            ("Text Structure Analysis", "Identify and use text structure to comprehend"),
+            ("Main Idea Detective", "Find and support main ideas in informational text"),
+            ("Making Connections", "Connect text to self, other texts, and the world"),
+        ],
+    }
+    intervention_count = 0
+    for skill_area, templates in INTERVENTION_TEMPLATES.items():
+        for title, desc in templates:
+            for grade_start, grade_end in [("K", "2"), ("1", "3"), ("2", "5"), ("3", "8"), ("K", "8")]:
+                if intervention_count >= 220:
+                    break
+                intv = Intervention(
+                    title=f"{title} ({grade_start}-{grade_end})",
+                    description=desc,
+                    skill_area=skill_area,
+                    grade_min=grade_start,
+                    grade_max=grade_end,
+                    duration_minutes=random.choice([10, 15, 20, 25, 30, 45]),
+                    materials=random.choice(["Cards, markers", "Whiteboard, tiles", "Books, pencils", "Digital tools", "Printed worksheets"]),
+                    evidence_level=random.choice(EVIDENCE_LEVELS),
+                    instructions=f"Step 1: Introduce the activity.\nStep 2: Model the process.\nStep 3: Guided practice.\nStep 4: Independent practice.\nStep 5: Review and discuss.",
+                )
+                db.add(intv)
+                intervention_count += 1
+            if intervention_count >= 220:
+                break
+    db.commit()
+    print(f"  Created {intervention_count} interventions.")
+
+    # ------------------------------------------------------------------
+    print("\n[10/16] Seeding PD courses and modules...")
+    PD_COURSES_DATA = [
+        ("Introduction to CUBED-3", "Learn the fundamentals of the CUBED-3 assessment system", 2.0, [
+            ("Overview of CUBED-3", "The CUBED-3 (Comprehensive Universal Battery for the Evaluation of Diverse learners) is a standardized assessment system...", None),
+            ("NLM Subtests", "The Narrative Language Measures assess listening and reading comprehension through retell and question tasks...",
+             '[{"q":"What does NLM stand for?","options":["Narrative Language Measures","National Learning Method","New Literacy Model"],"answer":0}]'),
+            ("DDM Subtests", "The Dynamic Decoding Measures assess phonemic awareness, phonics, orthographic mapping, and decoding skills...",
+             '[{"q":"Which subtest measures phonemic awareness?","options":["DDM_DI","DDM_PA","DDM_OM"],"answer":1}]'),
+            ("Scoring Basics", "Learn how to score assessments accurately, including risk classification and benchmark thresholds...", None),
+        ]),
+        ("Scoring Accuracy Training", "Master precise scoring techniques for all CUBED-3 subtests", 3.0, [
+            ("Retell Scoring Deep Dive", "NDC, EDC, SC, and VC scoring elements in detail...", None),
+            ("Question Scoring", "Factual, Inferential Vocabulary, and Inferential Reasoning scoring protocols...",
+             '[{"q":"How many points for a fully correct inferential reasoning answer?","options":["1","2","3"],"answer":2}]'),
+            ("DDM Scoring", "Phoneme segmentation, blending, and letter-sound scoring guidelines...", None),
+            ("Calibration Exercises", "Practice scoring with sample recordings and compare against master scores...",
+             '[{"q":"A student scores 15/48 on retell. What risk level?","options":["Benchmark","Moderate","High"],"answer":2}]'),
+            ("Common Scoring Errors", "Avoid the most common mistakes examiners make when scoring assessments...", None),
+        ]),
+        ("IntelliScore Training", "Learn to use the AI-powered scoring assistant effectively", 1.5, [
+            ("What is IntelliScore?", "IntelliScore uses AI to transcribe and analyze student narratives automatically...", None),
+            ("Recording Best Practices", "Tips for getting clear audio recordings: microphone placement, room acoustics...",
+             '[{"q":"What is the recommended microphone distance?","options":["1 inch","6-8 inches","2 feet"],"answer":1}]'),
+            ("Reviewing AI Scores", "How to review and validate IntelliScore results before finalizing...", None),
+        ]),
+        ("MTSS Implementation", "Implement Multi-Tiered Systems of Support using assessment data", 2.5, [
+            ("MTSS Framework Overview", "Understanding the three tiers of support and how assessment data drives decisions...", None),
+            ("Data-Based Decision Making", "Using CUBED-3 data to identify students who need additional support...",
+             '[{"q":"Which tier is for intensive intervention?","options":["Tier 1","Tier 2","Tier 3"],"answer":2}]'),
+            ("Progress Monitoring", "How to use progress monitoring assessments to track student response to intervention...", None),
+            ("Intervention Selection", "Choosing evidence-based interventions matched to student needs...", None),
+        ]),
+        ("Data-Driven Instruction", "Use assessment data to inform daily teaching practice", 2.0, [
+            ("Understanding Your Data", "Reading and interpreting risk reports, trend data, and benchmark comparisons...", None),
+            ("Flexible Grouping", "Creating and managing instructional groups based on assessment data...",
+             '[{"q":"How often should groups be re-evaluated?","options":["Weekly","Monthly","Each benchmark window"],"answer":2}]'),
+            ("Differentiating Instruction", "Strategies for adjusting instruction based on student performance levels...", None),
+            ("Family Communication", "Sharing assessment data with families in understandable and actionable ways...", None),
+            ("Action Planning", "Creating action plans based on data to improve student outcomes...", None),
+        ]),
+    ]
+    course_count = 0
+    module_count = 0
+    for title, desc, hours, modules in PD_COURSES_DATA:
+        course = PDCourse(title=title, description=desc, duration_hours=hours)
+        db.add(course)
+        db.flush()
+        course_count += 1
+        for i, (mtitle, mcontent, mquiz) in enumerate(modules):
+            mod = PDModule(course_id=course.id, title=mtitle, content=mcontent, quiz_json=mquiz, order=i)
+            db.add(mod)
+            module_count += 1
+    db.commit()
+    for user in [demo_user] + all_users[:10]:
+        mods = db.query(PDModule).all()
+        for mod in random.sample(mods, min(random.randint(3, 10), len(mods))):
+            prog = PDProgress(user_id=user.id, module_id=mod.id, completed=True,
+                             score=round(random.uniform(70, 100), 1),
+                             completed_at=datetime.datetime.utcnow() - datetime.timedelta(days=random.randint(1, 90)))
+            db.add(prog)
+    db.commit()
+    print(f"  Created {course_count} courses with {module_count} modules.")
+
+    # ------------------------------------------------------------------
+    print("\n[11/16] Seeding badges and gamification data...")
+    BADGES_DATA = [
+        ("First Assessment", "Completed your first assessment", "first_assessment", "award"),
+        ("Five Assessments", "Completed 5 assessments", "five_assessments", "star"),
+        ("Risk Reducer", "Moved from high to benchmark risk", "risk_reducer", "trending-up"),
+        ("Perfect Score", "Achieved a perfect score on any target", "perfect_score", "target"),
+        ("7-Day Streak", "Assessed 7 days in a row", "streak_7", "flame"),
+        ("Speed Reader", "Reading fluency above grade level", "speed_reader", "zap"),
+        ("Comprehension Champion", "Perfect retell score", "comprehension_champion", "brain"),
+        ("Phonics Master", "All DDM targets at benchmark", "phonics_master", "book-open"),
+        ("Growth Mindset", "Showed consistent improvement", "growth_mindset", "sprout"),
+        ("Team Player", "Part of a study group", "team_player", "users"),
+        ("Bookworm", "Completed 10 reading assessments", "bookworm", "book"),
+        ("Rising Star", "Most improved in class", "rising_star", "sunrise"),
+        ("Vocabulary Virtuoso", "Top vocabulary scores", "vocabulary_virtuoso", "message-square"),
+        ("Quick Thinker", "Fast and accurate responses", "quick_thinker", "clock"),
+        ("Storyteller", "Excellent narrative retell", "storyteller", "mic"),
+    ]
+    badge_objs = []
+    for name, desc, criteria, icon in BADGES_DATA:
+        b = Badge(name=name, description=desc, criteria=criteria, icon=icon)
+        db.add(b)
+        badge_objs.append(b)
+    db.flush()
+    sb_count = 0
+    streak_count = 0
+    sample_students = random.sample(all_students[:500], min(200, len(all_students[:500])))
+    for student in sample_students:
+        n_badges = random.randint(1, 6)
+        for badge in random.sample(badge_objs, min(n_badges, len(badge_objs))):
+            db.add(StudentBadge(student_id=student.id, badge_id=badge.id,
+                               earned_at=datetime.datetime.utcnow() - datetime.timedelta(days=random.randint(1, 180))))
+            sb_count += 1
+        streak = ReadingStreak(student_id=student.id,
+                              current_streak=random.randint(0, 30),
+                              longest_streak=random.randint(5, 60),
+                              last_activity_date=(datetime.datetime.utcnow() - datetime.timedelta(days=random.randint(0, 7))).strftime("%Y-%m-%d"))
+        db.add(streak)
+        streak_count += 1
+    db.commit()
+    print(f"  Created {len(badge_objs)} badges, {sb_count} awards, {streak_count} streaks.")
+
+    # ------------------------------------------------------------------
+    print("\n[12/16] Seeding SEL screenings...")
+    sel_count = 0
+    sel_students = random.sample(active_students[:1000], min(300, len(active_students[:1000])))
+    for student in sel_students:
+        screener = _get_examiner(student, org_users) or demo_user
+        n_screenings = random.randint(1, 3)
+        for i in range(n_screenings):
+            vals = {k: round(random.uniform(1, 5), 1)
+                    for k in ["self_awareness", "self_management", "social_awareness", "relationship_skills", "decision_making"]}
+            total = round(sum(vals.values()) / 5, 1)
+            risk = "low" if total >= 4 else ("moderate" if total >= 2.5 else "high")
+            db.add(SELScreening(
+                student_id=student.id, screener_id=screener.id,
+                date=(datetime.datetime.utcnow() - datetime.timedelta(days=random.randint(1, 300))).strftime("%Y-%m-%d"),
+                total_score=total, risk_level=risk, **vals,
+            ))
+            sel_count += 1
+    db.commit()
+    print(f"  Created {sel_count} SEL screenings for {len(sel_students)} students.")
+
+    # ------------------------------------------------------------------
+    print("\n[13/16] Seeding parent users...")
+    parent_count = 0
+    parent_users = []
+    for i in range(5):
+        pu = User(
+            email=f"parent{i+1}@insight-seed.edu",
+            hashed_password=password_hash,
+            first_name=random.choice(FIRST_NAMES),
+            last_name=random.choice(LAST_NAMES),
+            role="parent",
+            is_active=True,
+            organization_id=orgs[0].id,
+        )
+        db.add(pu)
+        parent_users.append(pu)
+    db.flush()
+    demo_org_kids = org_students.get(orgs[0].id, [])[:50]
+    for i, pu in enumerate(parent_users):
+        children = demo_org_kids[i*3:(i+1)*3] if i*3 < len(demo_org_kids) else demo_org_kids[:2]
+        for child in children:
+            db.execute(parent_students.insert().values(user_id=pu.id, student_id=child.id))
+            parent_count += 1
+    db.commit()
+    print(f"  Created {len(parent_users)} parent users with {parent_count} child links.")
+    print(f"  Parent login: parent1@insight-seed.edu / password123")
+
+    # ------------------------------------------------------------------
+    print("\n[14/16] Seeding test items for Test Builder...")
+    ti_count = 0
+    ITEM_TEMPLATES = [
+        ("What sound does the letter '{l}' make?", "oral", "phonemic_awareness"),
+        ("Read the word: {w}", "oral", "phonics"),
+        ("Which word rhymes with '{w}'?", "selected", "phonemic_awareness"),
+        ("What is the main idea of the passage?", "constructed", "comprehension"),
+        ("Segment the word '{w}' into individual sounds.", "oral", "phonemic_awareness"),
+        ("Read the following sentence fluently.", "oral", "fluency"),
+        ("What does the word '{w}' mean in this context?", "selected", "vocabulary"),
+        ("Retell the story in your own words.", "constructed", "comprehension"),
+        ("Blend the sounds /k/ /a/ /t/ together.", "oral", "phonemic_awareness"),
+        ("Which prefix means 'not'?", "selected", "vocabulary"),
+    ]
+    letters = list("abcdefghijklmnopqrstuvwxyz")
+    sample_words = ["cat", "dog", "sun", "run", "big", "red", "hat", "map", "pen", "bus",
+                    "jump", "play", "read", "fish", "tree", "star", "moon", "bird", "ship", "blue"]
+    for grade in ["K", "1", "2", "3", "4", "5"]:
+        for tmpl, rtype, skill in ITEM_TEMPLATES:
+            stem = tmpl.format(l=random.choice(letters), w=random.choice(sample_words))
+            db.add(TestItem(
+                stem=stem, response_type=rtype, answer_key=random.choice(sample_words),
+                skill_area=skill, grade=grade,
+                difficulty=random.choice(["easy", "medium", "hard"]),
+                created_by=demo_user.id,
+            ))
+            ti_count += 1
+    db.commit()
+    print(f"  Created {ti_count} test items.")
+
+    # ------------------------------------------------------------------
+    print("\n[15/16] Seeding workspaces...")
+    ws_count = 0
+    ws_types = ["plc", "grade_team", "intervention", "custom"]
+    ws_names = ["Grade 1 PLC", "Reading Intervention Team", "Grade 2-3 Team", "Literacy Leaders", "Data Review Group"]
+    for i, name in enumerate(ws_names):
+        ws = Workspace(name=name, ws_type=ws_types[i % len(ws_types)], owner_id=demo_user.id)
+        db.add(ws)
+        db.flush()
+        members = random.sample(all_users[:20], min(3, len(all_users[:20])))
+        for m in members:
+            db.execute(workspace_members.insert().values(workspace_id=ws.id, user_id=m.id))
+        for j in range(random.randint(3, 8)):
+            db.add(WorkspaceNote(
+                workspace_id=ws.id,
+                student_id=random.choice(all_students[:100]).id if random.random() < 0.6 else None,
+                user_id=random.choice(members + [demo_user]).id if members else demo_user.id,
+                content=random.choice([
+                    "Student showing great progress in fluency this week.",
+                    "Need to reassess after intervention cycle.",
+                    "Parent conference scheduled for next week.",
+                    "Consider moving to Tier 2 support.",
+                    "Great improvement on retell scores!",
+                ]),
+                created_at=datetime.datetime.utcnow() - datetime.timedelta(days=random.randint(1, 30)),
+            ))
+        for j in range(random.randint(2, 5)):
+            db.add(WorkspaceActionItem(
+                workspace_id=ws.id,
+                title=random.choice([
+                    "Review benchmark data for Grade 1",
+                    "Schedule parent conferences",
+                    "Update intervention plans",
+                    "Prepare materials for next week",
+                    "Complete progress monitoring assessments",
+                ]),
+                assigned_to=random.choice(members).id if members else demo_user.id,
+                due_date=(datetime.datetime.utcnow() + datetime.timedelta(days=random.randint(1, 14))).strftime("%Y-%m-%d"),
+                is_complete=random.random() < 0.3,
+            ))
+        ws_count += 1
+    db.commit()
+    print(f"  Created {ws_count} workspaces with notes and action items.")
+
+    # ------------------------------------------------------------------
+    # 16. Generate CSV test file for bulk import coverage
+    # ------------------------------------------------------------------
+    print("\n[16/16] Generating sample CSV for bulk-import testing...")
     csv_path = Path(__file__).parent / "data" / "sample_import.csv"
     with open(csv_path, "w") as f:
         f.write("first_name,last_name,grade,student_id,school,district,gender,teacher_email\n")

@@ -136,6 +136,98 @@ export const api = {
   // Benchmarks
   getBenchmarks: () => request('/assessments/benchmarks'),
 
+  // Notifications
+  getNotifications: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/notifications/${qs ? `?${qs}` : ''}`);
+  },
+  markNotificationRead: (id) => request(`/notifications/${id}/read`, { method: 'POST' }),
+  markAllNotificationsRead: () => request('/notifications/mark-all-read', { method: 'POST' }),
+  getUnreadCount: () => request('/notifications/unread-count'),
+
+  // MTSS
+  tierSummary: () => request('/mtss/tier-summary'),
+  tierStudents: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/mtss/tier-students${qs ? `?${qs}` : ''}`);
+  },
+  tierHistory: (studentId) => request(`/mtss/tier-history/${studentId}`),
+  createInterventionLog: (data) => request('/mtss/intervention-log', { method: 'POST', body: JSON.stringify(data) }),
+  getInterventionLogs: (studentId) => request(`/mtss/intervention-logs/${studentId}`),
+
+  // Interventions
+  listInterventions: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/interventions/${qs ? `?${qs}` : ''}`);
+  },
+  getIntervention: (id) => request(`/interventions/${id}`),
+  assignIntervention: (data) => request('/interventions/assign', { method: 'POST', body: JSON.stringify(data) }),
+  getAssignments: (studentId) => request(`/interventions/assignments/${studentId}`),
+  updateAssignmentStatus: (id, status) => request(`/interventions/assignments/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
+
+  // PD Hub
+  listPDCourses: () => request('/pd/courses'),
+  getPDCourse: (id) => request(`/pd/courses/${id}`),
+  completePDModule: (id, score) => request(`/pd/modules/${id}/complete`, { method: 'POST', body: JSON.stringify({ score }) }),
+  getMyPDProgress: () => request('/pd/my-progress'),
+  getPDCertificate: (courseId) => request(`/pd/certificate/${courseId}`),
+
+  // Pathways
+  generatePathway: (studentId) => request(`/pathways/generate/${studentId}`, { method: 'POST' }),
+  getStudentPathway: (studentId) => request(`/pathways/student/${studentId}`),
+  completePathwayActivity: (id) => request(`/pathways/activities/${id}/complete`, { method: 'PUT' }),
+  deletePathway: (id) => request(`/pathways/${id}`, { method: 'DELETE' }),
+
+  // Executive Analytics
+  getScorecard: () => request('/executive/scorecard'),
+  getSchoolComparison: () => request('/executive/school-comparison'),
+
+  // Test Builder
+  listTestItems: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/test-builder/items${qs ? `?${qs}` : ''}`);
+  },
+  createTestItem: (data) => request('/test-builder/items', { method: 'POST', body: JSON.stringify(data) }),
+  listCustomTests: () => request('/test-builder/tests'),
+  createCustomTest: (data) => request('/test-builder/tests', { method: 'POST', body: JSON.stringify(data) }),
+  getCustomTest: (id) => request(`/test-builder/tests/${id}`),
+  deleteCustomTest: (id) => request(`/test-builder/tests/${id}`, { method: 'DELETE' }),
+
+  // Workspaces
+  listWorkspaces: () => request('/workspaces/'),
+  createWorkspace: (data) => request('/workspaces/', { method: 'POST', body: JSON.stringify(data) }),
+  getWorkspace: (id) => request(`/workspaces/${id}`),
+  addWorkspaceNote: (id, data) => request(`/workspaces/${id}/notes`, { method: 'POST', body: JSON.stringify(data) }),
+  getWorkspaceNotes: (id) => request(`/workspaces/${id}/notes`),
+  addActionItem: (id, data) => request(`/workspaces/${id}/action-items`, { method: 'POST', body: JSON.stringify(data) }),
+  getActionItems: (id) => request(`/workspaces/${id}/action-items`),
+  toggleActionItem: (id) => request(`/workspaces/action-items/${id}/toggle`, { method: 'PUT' }),
+
+  // Gamification
+  listBadges: () => request('/gamification/badges'),
+  getStudentBadges: (studentId) => request(`/gamification/student/${studentId}/badges`),
+  getStudentStreak: (studentId) => request(`/gamification/student/${studentId}/streak`),
+  getStudentProfile: (studentId) => request(`/gamification/student/${studentId}/profile`),
+  checkBadges: (studentId) => request(`/gamification/student/${studentId}/check-badges`, { method: 'POST' }),
+
+  // SEL
+  createSELScreening: (data) => request('/sel/screenings', { method: 'POST', body: JSON.stringify(data) }),
+  getStudentSEL: (studentId) => request(`/sel/student/${studentId}`),
+  getSELClassSummary: () => request('/sel/class-summary'),
+  getSELCorrelation: () => request('/sel/correlation'),
+
+  // Predictions
+  getAtRiskPredictions: () => request('/predictions/at-risk'),
+  toggleWatchlist: (studentId) => request(`/predictions/${studentId}/watchlist`, { method: 'POST' }),
+
+  // AI Assistant
+  askAssistant: (query) => request('/assistant/ask', { method: 'POST', body: JSON.stringify({ query }) }),
+
+  // Parent Portal
+  getMyChildren: () => request('/parent/my-children'),
+  getChildProgress: (studentId) => request(`/parent/child/${studentId}/progress`),
+  getChildActivities: (studentId) => request(`/parent/child/${studentId}/activities`),
+
   // Reports
   riskSummary: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
@@ -148,6 +240,15 @@ export const api = {
   studentProgress: (studentId, params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/reports/student/${studentId}/progress${qs ? `?${qs}` : ''}`);
+  },
+  testingQueue: () => request('/reports/testing-queue'),
+  completionStats: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/reports/completion-stats${qs ? `?${qs}` : ''}`);
+  },
+  riskHeatmap: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/reports/risk-heatmap${qs ? `?${qs}` : ''}`);
   },
   exportReport: (type, params = {}) => {
     const qs = new URLSearchParams(params).toString();

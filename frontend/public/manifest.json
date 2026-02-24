@@ -1,0 +1,17 @@
+{
+  "name": "Insight - CUBED-3 Assessment Platform",
+  "short_name": "Insight",
+  "description": "AI-powered literacy assessment and progress monitoring",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#1e40af",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
