@@ -27,11 +27,12 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Insight POC", version="0.1.0", description="CUBED-3 Assessment Platform")
 
-CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
+CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "")
+cors_origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()] if CORS_ORIGINS else []
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in CORS_ORIGINS.split(",")],
-    allow_credentials=True,
+    allow_origins=cors_origins or ["*"],
+    allow_credentials=len(cors_origins) > 0,
     allow_methods=["*"],
     allow_headers=["*"],
 )
