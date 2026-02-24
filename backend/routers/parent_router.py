@@ -88,6 +88,7 @@ def get_my_children(
     students = db.query(Student).filter(Student.id.in_(child_ids)).all()
     return [
         {
+            "id": s.id,
             "student_id": s.id,
             "first_name": s.first_name,
             "last_name": s.last_name,

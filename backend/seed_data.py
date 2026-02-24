@@ -768,8 +768,12 @@ def _seed(db):
     db.flush()
     sb_count = 0
     streak_count = 0
-    sample_students = random.sample(all_students[:500], min(200, len(all_students[:500])))
-    for student in sample_students:
+    demo_student_set = set(s.id for s in demo_user.my_students)
+    gamification_students = list(demo_user.my_students) + [
+        s for s in random.sample(all_students, min(100, len(all_students)))
+        if s.id not in demo_student_set
+    ]
+    for student in gamification_students:
         n_badges = random.randint(1, 6)
         for badge in random.sample(badge_objs, min(n_badges, len(badge_objs))):
             db.add(StudentBadge(student_id=student.id, badge_id=badge.id,
@@ -787,7 +791,9 @@ def _seed(db):
     # ------------------------------------------------------------------
     print("\n[12/16] Seeding SEL screenings...")
     sel_count = 0
-    sel_students = random.sample(active_students[:1000], min(300, len(active_students[:1000])))
+    sel_demo_ids = set(s.id for s in demo_user.my_students)
+    sel_extra = [s for s in random.sample(active_students, min(200, len(active_students))) if s.id not in sel_demo_ids]
+    sel_students = list(demo_user.my_students) + sel_extra
     for student in sel_students:
         screener = _get_examiner(student, org_users) or demo_user
         n_screenings = random.randint(1, 3)
@@ -862,6 +868,34 @@ def _seed(db):
             ti_count += 1
     db.commit()
     print(f"  Created {ti_count} test items.")
+
+    # Seed custom tests for demo user
+    all_test_items = db.query(TestItem).filter(TestItem.created_by == demo_user.id).all()
+    ct_count = 0
+    CUSTOM_TEST_DEFS = [
+        ("Grade K Phonemic Awareness Quick Check", "phonemic_awareness", "K"),
+        ("Fluency Benchmark Screen", "fluency", "2"),
+        ("Comprehension Deep Dive", "comprehension", "3"),
+        ("Vocabulary Assessment", "vocabulary", "4"),
+        ("Phonics Mastery Check", "phonics", "1"),
+    ]
+    for ct_name, ct_skill, ct_grade in CUSTOM_TEST_DEFS:
+        ct = CustomTest(
+            name=ct_name,
+            description=f"Custom assessment targeting {ct_skill} for grade {ct_grade}",
+            created_by=demo_user.id,
+        )
+        db.add(ct)
+        db.flush()
+        matching_items = [it for it in all_test_items if it.skill_area == ct_skill and it.grade == ct_grade]
+        if not matching_items:
+            matching_items = [it for it in all_test_items if it.skill_area == ct_skill]
+        selected = random.sample(matching_items, min(5, len(matching_items)))
+        for item in selected:
+            db.execute(custom_test_items.insert().values(custom_test_id=ct.id, test_item_id=item.id))
+        ct_count += 1
+    db.commit()
+    print(f"  Created {ct_count} custom tests for demo user.")
 
     # ------------------------------------------------------------------
     print("\n[15/16] Seeding workspaces...")

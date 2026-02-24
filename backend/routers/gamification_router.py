@@ -150,9 +150,13 @@ def get_student_profile(
     return {
         "student_id": student_id,
         "name": f"{student.first_name} {student.last_name}",
+        "first_name": student.first_name,
+        "last_name": student.last_name,
         "grade": student.grade,
+        "school": student.school,
         "badges": badges,
         "streak": streak_data,
+        "total_assessments": total_assessments,
         "assessment_stats": {
             "total_assessments": total_assessments,
             "latest_scores": latest_scores,

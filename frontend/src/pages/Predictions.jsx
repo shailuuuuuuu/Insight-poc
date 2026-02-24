@@ -24,7 +24,18 @@ export default function Predictions() {
 
   useEffect(() => {
     api.getAtRiskPredictions()
-      .then(setPredictions)
+      .then(data => {
+        const normalized = data.map(p => {
+          const parts = p.student_name?.split(', ') || ['', ''];
+          return {
+            ...p,
+            last_name: parts[0],
+            first_name: parts[1] || '',
+            probability: p.probability ? p.probability.charAt(0).toUpperCase() + p.probability.slice(1) : p.probability,
+          };
+        });
+        setPredictions(normalized);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -93,7 +104,12 @@ export default function Predictions() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-red-200 p-5">
+        <div
+          onClick={() => { setProbFilter(probFilter === 'High' ? 'All' : 'High'); setShowFilters(true); }}
+          className={`bg-white rounded-xl border p-5 cursor-pointer transition-all hover:shadow-md ${
+            probFilter === 'High' ? 'border-red-400 ring-2 ring-red-200' : 'border-red-200'
+          }`}
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
               <AlertTriangle className="w-5 h-5 text-red-600" />
@@ -104,7 +120,12 @@ export default function Predictions() {
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-amber-200 p-5">
+        <div
+          onClick={() => { setProbFilter(probFilter === 'Medium' ? 'All' : 'Medium'); setShowFilters(true); }}
+          className={`bg-white rounded-xl border p-5 cursor-pointer transition-all hover:shadow-md ${
+            probFilter === 'Medium' ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-200'
+          }`}
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
               <AlertTriangle className="w-5 h-5 text-amber-600" />

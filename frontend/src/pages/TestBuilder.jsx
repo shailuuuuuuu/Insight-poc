@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
 import { PenTool, Search, Plus, X, ChevronUp, ChevronDown, Trash2, Eye, Check } from 'lucide-react';
 
@@ -14,6 +14,10 @@ export default function TestBuilder() {
   const [loading, setLoading] = useState(true);
   const [showAddItem, setShowAddItem] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+  const [selectedTest, setSelectedTest] = useState(null);
+  const [testDetail, setTestDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [expandedItem, setExpandedItem] = useState(null);
   const [filters, setFilters] = useState({ skill_area: '', grade: '', difficulty: '', search: '' });
 
   const loadItems = useCallback(async () => {
@@ -44,8 +48,20 @@ export default function TestBuilder() {
     if (!confirm('Delete this test?')) return;
     try {
       await api.deleteCustomTest(id);
+      if (selectedTest === id) { setSelectedTest(null); setTestDetail(null); }
       loadTests();
     } catch {}
+  };
+
+  const handleViewTest = async (id) => {
+    if (selectedTest === id) { setSelectedTest(null); setTestDetail(null); return; }
+    setSelectedTest(id);
+    setDetailLoading(true);
+    try {
+      const detail = await api.getCustomTest(id);
+      setTestDetail(detail);
+    } catch { setTestDetail(null); }
+    setDetailLoading(false);
   };
 
   return (
@@ -60,19 +76,34 @@ export default function TestBuilder() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-        {[{ key: 'items', label: 'Item Bank' }, { key: 'tests', label: 'My Tests' }].map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              tab === t.key ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* Summary Tiles — click to switch tabs */}
+      <div className="grid grid-cols-2 gap-4 max-w-lg">
+        <button
+          onClick={() => setTab('items')}
+          className={`rounded-xl border-2 p-5 text-left transition-all hover:shadow-md ${
+            tab === 'items'
+              ? 'border-primary-500 bg-primary-50 shadow-sm'
+              : 'border-gray-200 bg-white hover:border-gray-300'
+          }`}
+        >
+          <p className={`text-3xl font-bold ${tab === 'items' ? 'text-primary-700' : 'text-gray-800'}`}>
+            {items.length}
+          </p>
+          <p className="text-sm font-medium text-gray-500 mt-1">Item Bank</p>
+        </button>
+        <button
+          onClick={() => setTab('tests')}
+          className={`rounded-xl border-2 p-5 text-left transition-all hover:shadow-md ${
+            tab === 'tests'
+              ? 'border-violet-500 bg-violet-50 shadow-sm'
+              : 'border-gray-200 bg-white hover:border-gray-300'
+          }`}
+        >
+          <p className={`text-3xl font-bold ${tab === 'tests' ? 'text-violet-700' : 'text-gray-800'}`}>
+            {tests.length}
+          </p>
+          <p className="text-sm font-medium text-gray-500 mt-1">My Tests</p>
+        </button>
       </div>
 
       {tab === 'items' && (
@@ -154,27 +185,59 @@ export default function TestBuilder() {
                   </thead>
                   <tbody>
                     {items.map((item) => (
-                      <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-900 max-w-xs truncate" title={item.stem}>
-                          {item.stem}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium capitalize">
-                            {item.response_type}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 capitalize">{item.skill_area?.replace(/_/g, ' ')}</td>
-                        <td className="px-4 py-3 text-gray-600">{item.grade}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${
-                            item.difficulty === 'easy' ? 'bg-green-50 text-green-700'
-                              : item.difficulty === 'hard' ? 'bg-red-50 text-red-700'
-                              : 'bg-amber-50 text-amber-700'
-                          }`}>
-                            {item.difficulty}
-                          </span>
-                        </td>
-                      </tr>
+                      <React.Fragment key={item.id}>
+                        <tr
+                          onClick={() => setExpandedItem(expandedItem === item.id ? null : item.id)}
+                          className={`border-b border-gray-50 cursor-pointer transition-colors ${
+                            expandedItem === item.id ? 'bg-primary-50' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <td className="px-4 py-3 text-gray-900 max-w-xs truncate" title={item.stem}>
+                            <span className="flex items-center gap-2">
+                              <ChevronDown className={`w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform ${expandedItem === item.id ? 'rotate-180' : ''}`} />
+                              {item.stem}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium capitalize">
+                              {item.response_type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 capitalize">{item.skill_area?.replace(/_/g, ' ')}</td>
+                          <td className="px-4 py-3 text-gray-600">{item.grade}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${
+                              item.difficulty === 'easy' ? 'bg-green-50 text-green-700'
+                                : item.difficulty === 'hard' ? 'bg-red-50 text-red-700'
+                                : 'bg-amber-50 text-amber-700'
+                            }`}>
+                              {item.difficulty}
+                            </span>
+                          </td>
+                        </tr>
+                        {expandedItem === item.id && (
+                          <tr className="bg-gray-50">
+                            <td colSpan={5} className="px-6 py-4">
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <p className="text-xs font-medium text-gray-400 uppercase mb-1">Full Question</p>
+                                  <p className="text-gray-800">{item.stem}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-400 uppercase mb-1">Answer Key</p>
+                                  <p className="text-gray-800">{item.answer_key || '—'}</p>
+                                </div>
+                                {item.distractors && (
+                                  <div className="col-span-2">
+                                    <p className="text-xs font-medium text-gray-400 uppercase mb-1">Distractors</p>
+                                    <p className="text-gray-600">{Array.isArray(item.distractors) ? item.distractors.join(', ') : item.distractors}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -202,31 +265,99 @@ export default function TestBuilder() {
               <p className="text-sm mt-1">Create your first custom assessment</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {tests.map((test) => (
-                <div key={test.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
-                  <h3 className="font-semibold text-gray-900 truncate">{test.name}</h3>
-                  <p className="text-sm text-gray-500 mt-1">{test.item_count ?? test.items?.length ?? 0} items</p>
-                  {test.description && (
-                    <p className="text-xs text-gray-400 mt-2 line-clamp-2">{test.description}</p>
-                  )}
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={() => {/* could navigate to detail */}}
-                      className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50"
-                    >
-                      <Eye className="w-3.5 h-3.5" /> View
-                    </button>
-                    <button
-                      onClick={() => handleDeleteTest(test.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 rounded-lg text-xs text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Delete
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {tests.map((test) => (
+                  <div
+                    key={test.id}
+                    onClick={() => handleViewTest(test.id)}
+                    className={`bg-white rounded-xl shadow-sm border p-5 cursor-pointer transition-all hover:shadow-md ${
+                      selectedTest === test.id ? 'border-primary-400 ring-2 ring-primary-200' : 'border-gray-200'
+                    }`}
+                  >
+                    <h3 className="font-semibold text-gray-900 truncate">{test.name}</h3>
+                    <p className="text-sm text-gray-500 mt-1">{test.item_count ?? test.items?.length ?? 0} items</p>
+                    {test.description && (
+                      <p className="text-xs text-gray-400 mt-2 line-clamp-2">{test.description}</p>
+                    )}
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleViewTest(test.id); }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> View
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteTest(test.id); }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 rounded-lg text-xs text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {selectedTest && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">{testDetail?.name || 'Loading...'}</h2>
+                      {testDetail?.description && (
+                        <p className="text-sm text-gray-500 mt-0.5">{testDetail.description}</p>
+                      )}
+                    </div>
+                    <button onClick={() => { setSelectedTest(null); setTestDetail(null); }} className="text-gray-400 hover:text-gray-600">
+                      <X className="w-5 h-5" />
                     </button>
                   </div>
+                  {detailLoading ? (
+                    <div className="flex items-center justify-center h-32">
+                      <div className="animate-spin w-6 h-6 border-4 border-primary-200 border-t-primary-600 rounded-full" />
+                    </div>
+                  ) : testDetail?.items?.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b">
+                          <tr>
+                            <th className="text-left px-4 py-3 font-medium text-gray-500 w-8">#</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-500">Question / Stem</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-500">Type</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-500">Skill</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-500">Difficulty</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-500">Answer</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {testDetail.items.map((item, i) => (
+                            <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50">
+                              <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>
+                              <td className="px-4 py-3 text-gray-900">{item.stem}</td>
+                              <td className="px-4 py-3">
+                                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium capitalize">
+                                  {item.response_type}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-gray-600 capitalize">{item.skill_area?.replace(/_/g, ' ')}</td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${
+                                  item.difficulty === 'easy' ? 'bg-green-50 text-green-700'
+                                    : item.difficulty === 'hard' ? 'bg-red-50 text-red-700'
+                                    : 'bg-amber-50 text-amber-700'
+                                }`}>{item.difficulty}</span>
+                              </td>
+                              <td className="px-4 py-3 text-gray-500 text-xs">{item.answer_key || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center text-gray-400 text-sm">No items in this test.</div>
+                  )}
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       )}

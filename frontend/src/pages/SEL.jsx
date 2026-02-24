@@ -204,7 +204,16 @@ function StudentProfileTab() {
     if (!studentId) { setProfile(null); return; }
     setLoading(true);
     api.getStudentSEL(studentId)
-      .then(setProfile)
+      .then((screenings) => {
+        if (!screenings || screenings.length === 0) {
+          setProfile(null);
+          return;
+        }
+        setProfile({
+          latest: screenings[0],
+          history: screenings,
+        });
+      })
       .catch(() => setProfile(null))
       .finally(() => setLoading(false));
   }, [studentId]);
@@ -425,13 +434,24 @@ function ClassClimateTab() {
   );
 }
 
+const RISK_TO_NUM = { benchmark: 1, moderate: 2, high: 3 };
+const NUM_TO_RISK = { 1: 'Benchmark', 2: 'Moderate', 3: 'High' };
+const RISK_COLORS = { 1: '#22c55e', 2: '#f59e0b', 3: '#ef4444' };
+
 function CorrelationTab() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.getSELCorrelation()
-      .then(setData)
+      .then((raw) => {
+        const mapped = raw.map((d) => ({
+          ...d,
+          risk_num: RISK_TO_NUM[d.literacy_risk] ?? 0,
+          risk_label: d.literacy_risk,
+        }));
+        setData(mapped);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -456,25 +476,34 @@ function CorrelationTab() {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <h2 className="text-lg font-semibold text-gray-900 mb-1">SEL vs Literacy Risk</h2>
-      <p className="text-sm text-gray-400 mb-6">Each dot represents a student. Higher SEL scores correlate with lower literacy risk.</p>
+      <p className="text-sm text-gray-400 mb-6">Each dot represents a student. Higher SEL scores tend to correlate with lower literacy risk.</p>
+      <div className="flex items-center gap-4 mb-4">
+        {Object.entries(RISK_COLORS).map(([num, color]) => (
+          <div key={num} className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+            <span className="text-xs text-gray-500">{NUM_TO_RISK[num]}</span>
+          </div>
+        ))}
+      </div>
       <div className="h-96">
         <ResponsiveContainer>
-          <ScatterChart margin={{ top: 10, right: 30, bottom: 20, left: 10 }}>
+          <ScatterChart margin={{ top: 10, right: 30, bottom: 30, left: 20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis
               dataKey="sel_total"
               type="number"
               name="SEL Total"
-              domain={[0, 25]}
-              label={{ value: 'SEL Total Score', position: 'insideBottom', offset: -10, fontSize: 12 }}
+              domain={[0, 5]}
+              tickCount={6}
+              label={{ value: 'SEL Average Score (0–5)', position: 'insideBottom', offset: -15, fontSize: 12 }}
             />
             <YAxis
-              dataKey="literacy_risk"
+              dataKey="latest_score"
               type="number"
-              name="Literacy Risk"
-              label={{ value: 'Literacy Risk Level', angle: -90, position: 'insideLeft', fontSize: 12 }}
+              name="Latest Literacy Score"
+              label={{ value: 'Latest Literacy Score', angle: -90, position: 'insideLeft', offset: -5, fontSize: 12 }}
             />
-            <ZAxis range={[40, 160]} />
+            <ZAxis range={[50, 120]} />
             <Tooltip
               cursor={{ strokeDasharray: '3 3' }}
               content={({ payload }) => {
@@ -483,13 +512,19 @@ function CorrelationTab() {
                 return (
                   <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-3 text-sm">
                     <p className="font-semibold text-gray-900">{d.student_name || `Student #${d.student_id}`}</p>
-                    <p className="text-gray-500">SEL Total: {d.sel_total}</p>
-                    <p className="text-gray-500">Literacy Risk: {d.literacy_risk}</p>
+                    <p className="text-gray-500">SEL Score: {d.sel_total}</p>
+                    <p className="text-gray-500">Literacy Score: {d.latest_score}</p>
+                    <p className="text-gray-500">Literacy Risk: <span className="capitalize font-medium">{d.risk_label}</span></p>
+                    <p className="text-gray-500">SEL Risk: <span className="capitalize font-medium">{d.sel_risk}</span></p>
                   </div>
                 );
               }}
             />
-            <Scatter data={data} fill="#7c3aed" fillOpacity={0.6} />
+            <Scatter data={data} fillOpacity={0.7}>
+              {data.map((entry, i) => (
+                <Cell key={i} fill={RISK_COLORS[entry.risk_num] || '#94a3b8'} />
+              ))}
+            </Scatter>
           </ScatterChart>
         </ResponsiveContainer>
       </div>

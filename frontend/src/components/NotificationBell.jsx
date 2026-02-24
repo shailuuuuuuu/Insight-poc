@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell, BellOff, AlertTriangle, Clock, TrendingUp, CheckCircle, X
@@ -34,6 +34,18 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const panelRef = useRef(null);
+  const btnRef = useRef(null);
+  const [panelPos, setPanelPos] = useState({ top: 0, left: 0 });
+
+  const updatePanelPos = useCallback(() => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPanelPos({
+        top: rect.bottom + 8,
+        left: Math.max(8, rect.left),
+      });
+    }
+  }, []);
 
   const fetchNotifications = async () => {
     try {
@@ -47,7 +59,7 @@ export default function NotificationBell() {
   const fetchUnreadCount = async () => {
     try {
       const data = await api.getUnreadCount();
-      setUnreadCount(typeof data === 'number' ? data : data.count ?? 0);
+      setUnreadCount(typeof data === 'number' ? data : data.unread_count ?? data.count ?? 0);
     } catch {
       /* silent */
     }
@@ -60,12 +72,17 @@ export default function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    if (open) fetchNotifications();
-  }, [open]);
+    if (open) {
+      fetchNotifications();
+      updatePanelPos();
+    }
+  }, [open, updatePanelPos]);
 
   useEffect(() => {
     function handleClickOutside(e) {
-      if (panelRef.current && !panelRef.current.contains(e.target)) {
+      const clickedPanel = panelRef.current && panelRef.current.contains(e.target);
+      const clickedBtn = btnRef.current && btnRef.current.contains(e.target);
+      if (!clickedPanel && !clickedBtn) {
         setOpen(false);
       }
     }
@@ -100,10 +117,11 @@ export default function NotificationBell() {
   };
 
   return (
-    <div className="relative" ref={panelRef}>
+    <>
       <button
+        ref={btnRef}
         onClick={() => setOpen(prev => !prev)}
-        className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+        className="relative p-2 rounded-lg text-primary-200 hover:bg-primary-700 transition-colors"
         aria-label="Notifications"
       >
         <Bell className="w-5 h-5" />
@@ -115,15 +133,27 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
+        <div
+          ref={panelRef}
+          className="fixed w-96 max-w-[calc(100vw-1rem)] bg-white rounded-xl shadow-2xl border border-gray-200 z-[100] overflow-hidden"
+          style={{ top: panelPos.top, left: panelPos.left }}
+        >
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <h3 className="font-semibold text-gray-900">Notifications</h3>
-            <button
-              onClick={handleMarkAllRead}
-              className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-            >
-              Mark all read
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleMarkAllRead}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Mark all read
+              </button>
+              <button
+                onClick={() => setOpen(false)}
+                className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           <div className="max-h-[400px] overflow-y-auto divide-y divide-gray-50">
@@ -165,6 +195,6 @@ export default function NotificationBell() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

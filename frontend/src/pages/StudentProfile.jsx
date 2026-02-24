@@ -43,10 +43,17 @@ export default function StudentProfile() {
       api.getStudentProfile(studentId),
       api.getStudentBadges(studentId),
       api.getStudentStreak(studentId),
+      api.listBadges(),
     ])
-      .then(([prof, bdg, str]) => {
+      .then(([prof, earnedBdg, str, allBdg]) => {
         setProfile(prof);
-        setBadges(bdg);
+        const earnedIds = new Set(earnedBdg.map(b => b.badge?.id));
+        const merged = allBdg.map(b => ({
+          ...b,
+          earned: earnedIds.has(b.id),
+          earned_at: earnedBdg.find(e => e.badge?.id === b.id)?.earned_at,
+        }));
+        setBadges(merged);
         setStreak(str);
       })
       .catch(() => {})

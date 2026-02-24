@@ -13,7 +13,8 @@ TOY_ORDER = {"BOY": 0, "MOY": 1, "EOY": 2}
 
 
 def _get_trajectory(sessions: list) -> dict:
-    """Return score trajectory across BOY→MOY→EOY for the latest academic year."""
+    """Return score trajectory across BOY→MOY→EOY for the latest academic year.
+    Only considers main target scores (not sub_targets)."""
     if not sessions:
         return {}
 
@@ -24,6 +25,8 @@ def _get_trajectory(sessions: list) -> dict:
     trajectory = {}
     for session in year_sessions:
         for score in session.scores:
+            if score.sub_target is not None:
+                continue
             key = f"{session.subtest}_{score.target}"
             if key not in trajectory:
                 trajectory[key] = []
@@ -36,33 +39,45 @@ def _get_trajectory(sessions: list) -> dict:
 
 
 def _overall_risk(sessions: list) -> str:
-    """Determine current overall risk from the most recent completed session."""
+    """Determine current overall risk using majority rule from most recent session."""
     if not sessions:
         return "unknown"
     latest = max(sessions, key=lambda s: s.created_at)
-    risks = [sc.risk_level for sc in latest.scores if sc.risk_level]
-    if "high" in risks:
+    risks = [sc.risk_level for sc in latest.scores if sc.risk_level and sc.sub_target is None]
+    if not risks:
+        return "unknown"
+    from collections import Counter
+    counts = Counter(risks)
+    if counts.get("high", 0) >= len(risks) * 0.5:
         return "high"
-    if "moderate" in risks:
+    if counts.get("high", 0) + counts.get("moderate", 0) >= len(risks) * 0.5:
         return "moderate"
     return "benchmark"
 
 
 def _is_declining(trajectory: dict) -> tuple[bool, list[str]]:
-    """Check if scores are declining; return (declining, list of contributing factors)."""
+    """Check if scores are declining significantly (>=20% drop or risk escalation)."""
     declining = False
     factors = []
     for key, points in trajectory.items():
         if len(points) < 2:
+            if points and points[-1]["risk_level"] == "high":
+                factors.append(f"High risk on {key.replace('_', ' ')}")
             continue
         recent = points[-1]["raw_score"]
         previous = points[-2]["raw_score"]
-        if recent is not None and previous is not None and recent < previous:
+        if recent is not None and previous is not None and previous > 0:
+            drop_pct = (previous - recent) / previous
+            if drop_pct >= 0.20:
+                declining = True
+                factors.append(f"Declining {key.replace('_', ' ')} scores")
+        risk_escalation = (
+            points[-2]["risk_level"] in ("benchmark", "moderate")
+            and points[-1]["risk_level"] == "high"
+        )
+        if risk_escalation:
             declining = True
-            subtest_label = key.replace("_", " ")
-            factors.append(f"Declining {subtest_label} scores")
-        if points[-1]["risk_level"] == "high":
-            factors.append(f"High risk on {key.replace('_', ' ')}")
+            factors.append(f"Risk escalated to high on {key.replace('_', ' ')}")
     return declining, factors
 
 
@@ -76,6 +91,7 @@ def _latest_scores_dict(sessions: list) -> dict:
             "risk_level": sc.risk_level,
         }
         for sc in latest.scores
+        if sc.sub_target is None
     }
 
 

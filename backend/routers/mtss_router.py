@@ -53,7 +53,7 @@ def _latest_scores_for_org(db: Session, org_id: int):
                 TestSession.completed_at == latest_session_subq.c.max_completed,
             ),
         )
-        .filter(Score.risk_level.isnot(None))
+        .filter(Score.risk_level.isnot(None), Score.sub_target.is_(None))
         .all()
     )
 
@@ -66,13 +66,19 @@ def _latest_scores_for_org(db: Session, org_id: int):
 
 
 def _compute_tier(risk_levels: list[str]) -> int:
-    """Worst-case tier across all subtests for a student."""
-    worst = 1
-    for rl in risk_levels:
-        tier = TIER_MAP.get(rl, 1)
-        if tier > worst:
-            worst = tier
-    return worst
+    """Majority-rules tier: Tier 3 if >=50% high, Tier 2 if >=50% moderate+high,
+    else Tier 1. Prevents a single high score from putting students in Tier 3."""
+    if not risk_levels:
+        return 1
+    tiers = [TIER_MAP.get(rl, 1) for rl in risk_levels]
+    n = len(tiers)
+    high_count = tiers.count(3)
+    moderate_count = tiers.count(2)
+    if high_count >= n * 0.5:
+        return 3
+    if (high_count + moderate_count) >= n * 0.5:
+        return 2
+    return 1
 
 
 @router.get("/tier-summary")

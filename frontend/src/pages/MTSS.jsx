@@ -97,7 +97,13 @@ export default function MTSS() {
     );
   }
 
-  const tiers = tierSummary || { tier_1: 0, tier_2: 0, tier_3: 0, total: 1 };
+  const raw = tierSummary || {};
+  const tiers = {
+    tier_1: raw.tier1?.count ?? 0,
+    tier_2: raw.tier2?.count ?? 0,
+    tier_3: raw.tier3?.count ?? 0,
+    total: raw.total ?? 1,
+  };
   const total = tiers.total || tiers.tier_1 + tiers.tier_2 + tiers.tier_3 || 1;
   const pct = (n) => Math.round((n / total) * 100);
 
@@ -123,18 +129,21 @@ export default function MTSS() {
               count={tiers.tier_3}
               pct={pct(tiers.tier_3)}
               widthClass="w-1/3"
+              onClick={() => setActiveTierTab(3)}
             />
             <PyramidRow
               tier={2}
               count={tiers.tier_2}
               pct={pct(tiers.tier_2)}
               widthClass="w-2/3"
+              onClick={() => setActiveTierTab(2)}
             />
             <PyramidRow
               tier={1}
               count={tiers.tier_1}
               pct={pct(tiers.tier_1)}
               widthClass="w-full"
+              onClick={() => setActiveTierTab(1)}
             />
           </div>
           <p className="text-xs text-gray-400 text-center mt-4">{total} total students</p>
@@ -364,11 +373,14 @@ export default function MTSS() {
   );
 }
 
-function PyramidRow({ tier, count, pct, widthClass }) {
+function PyramidRow({ tier, count, pct, widthClass, onClick }) {
   const colors = TIER_COLORS[tier];
   return (
     <div className={`${widthClass} transition-all`}>
-      <div className={`${colors.bg} rounded-lg py-3 px-4 text-center text-white`}>
+      <div
+        onClick={onClick}
+        className={`${colors.bg} rounded-lg py-3 px-4 text-center text-white cursor-pointer hover:opacity-90 hover:scale-[1.02] transition-all`}
+      >
         <p className="text-sm font-bold">Tier {tier}</p>
         <p className="text-lg font-bold">{count}</p>
         <p className="text-xs opacity-90">{pct}%</p>
