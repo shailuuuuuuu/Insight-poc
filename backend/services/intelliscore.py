@@ -28,10 +28,11 @@ def save_audio(session_id: int, audio_bytes: bytes, filename: str) -> str:
     return str(dest)
 
 
-async def transcribe_audio(file_path: str) -> str:
+async def transcribe_audio(file_path: str) -> dict:
     """
     Transcribe audio file to text.
-    Uses OpenAI Whisper API if OPENAI_API_KEY is set, otherwise returns a placeholder.
+    Uses OpenAI Whisper API if OPENAI_API_KEY is set.
+    Returns a dict with transcript, auto_transcribed flag, and optional message.
     """
     if OPENAI_API_KEY:
         try:
@@ -46,15 +47,26 @@ async def transcribe_audio(file_path: str) -> str:
                         timeout=120,
                     )
                 resp.raise_for_status()
-                return resp.json()["text"]
+                return {
+                    "transcript": resp.json()["text"],
+                    "auto_transcribed": True,
+                }
         except Exception as e:
-            return f"[Transcription error: {e}]"
+            return {
+                "transcript": "",
+                "auto_transcribed": False,
+                "message": f"Transcription failed: {e}. You can type or paste the transcript manually.",
+            }
 
-    return (
-        "[IntelliScore placeholder] Audio recorded successfully. "
-        "Set the OPENAI_API_KEY environment variable to enable automatic transcription via Whisper. "
-        "You can also type or paste a transcript manually below."
-    )
+    return {
+        "transcript": "",
+        "auto_transcribed": False,
+        "message": (
+            "Automatic transcription is not configured. "
+            "Please type or paste the student's narrative retell transcript below. "
+            "To enable auto-transcription, set the OPENAI_API_KEY environment variable."
+        ),
+    }
 
 
 def analyze_transcript(transcript: str) -> dict:
@@ -65,7 +77,7 @@ def analyze_transcript(transcript: str) -> dict:
     In the real IntelliScore engine, this would use NLP models trained on
     the CUBED-3 rubric. This POC uses heuristic keyword detection.
     """
-    if not transcript or transcript.startswith("["):
+    if not transcript or not transcript.strip():
         return {}
 
     sentences = re.split(r'[.!?]+', transcript)

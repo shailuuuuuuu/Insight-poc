@@ -394,14 +394,42 @@ export default function Assess() {
               sessionId={session.id}
               onScoresReady={(analysis) => {
                 if (analysis.sub_scores) {
-                  const newScores = { ...scores };
-                  if ('NLM_RETELL' in newScores) {
-                    newScores['NLM_RETELL'] = String(analysis.total_retell_score);
-                  }
-                  setScores(newScores);
+                  setScores(prev => {
+                    const updated = { ...prev };
+                    if ('NLM_RETELL' in updated) {
+                      updated['NLM_RETELL'] = String(analysis.total_retell_score);
+                    }
+                    return updated;
+                  });
                 }
               }}
             />
+          )}
+
+          {/* Manual score entry for targets IntelliScore can't fill */}
+          {scoringMode === 'intelliscore' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+              <h3 className="text-sm font-semibold text-gray-700">Additional Scores (Manual Entry)</h3>
+              <p className="text-xs text-gray-500">
+                IntelliScore fills the Retell score automatically. Enter scores for other targets below.
+              </p>
+              <div className="space-y-3">
+                {Object.keys(scores).filter(t => t !== 'NLM_RETELL').map((target) => (
+                  <div key={target} className="flex items-center gap-4">
+                    <label className="w-48 text-sm font-medium text-gray-700">{formatTarget(target)}</label>
+                    <input
+                      type="number"
+                      value={scores[target]}
+                      onChange={(e) => setScores((prev) => ({ ...prev, [target]: e.target.value }))}
+                      placeholder="Score"
+                      min="0"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                    {scores[target] !== '' && <span className="text-green-600 text-xs font-medium">Set</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* NLM Reading — Stimulus + Timed Reading + Retell + Questions */}
@@ -448,24 +476,43 @@ export default function Assess() {
             <DynamicAssessmentPanel />
           )}
 
-          {/* Fallback manual entry for any targets not covered by specialized UIs */}
+          {/* Score Summary / Manual Entry */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
-            <h3 className="text-sm font-semibold text-gray-700">Score Summary / Manual Entry</h3>
-            <div className="space-y-4">
-              {Object.keys(scores).map((target) => (
-                <div key={target} className="flex items-center gap-4">
-                  <label className="w-48 text-sm font-medium text-gray-700">{formatTarget(target)}</label>
-                  <input
-                    type="number"
-                    value={scores[target]}
-                    onChange={(e) => setScores((prev) => ({ ...prev, [target]: e.target.value }))}
-                    placeholder="Score"
-                    min="0"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  {scores[target] !== '' && <span className="text-green-600 text-xs font-medium">Set</span>}
-                </div>
-              ))}
+            <h3 className="text-sm font-semibold text-gray-700">Score Summary</h3>
+            <div className="space-y-3">
+              {Object.keys(scores).map((target) => {
+                const hasValue = scores[target] !== '' && scores[target] !== null && scores[target] !== undefined;
+                return (
+                  <div key={target} className={`flex items-center gap-4 p-3 rounded-lg ${hasValue ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <label className="w-48 text-sm font-medium text-gray-700">{formatTarget(target)}</label>
+                    <input
+                      type="number"
+                      value={scores[target]}
+                      onChange={(e) => setScores((prev) => ({ ...prev, [target]: e.target.value }))}
+                      placeholder="—"
+                      min="0"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                    />
+                    {hasValue ? (
+                      <span className="text-green-600 text-xs font-semibold flex items-center gap-1">
+                        <CheckCircle className="w-3.5 h-3.5" /> {scores[target]}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">Not set</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Count of filled vs total */}
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <span className="text-xs text-gray-500">
+                {Object.values(scores).filter(v => v !== '' && v !== null && v !== undefined).length} of {Object.keys(scores).length} scores entered
+              </span>
+              {Object.values(scores).some(v => v === '' || v === null || v === undefined) && (
+                <span className="text-xs text-amber-600">Some scores are missing</span>
+              )}
             </div>
 
             <div className="flex justify-between pt-4">

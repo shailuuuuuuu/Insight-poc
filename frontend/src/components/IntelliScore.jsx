@@ -1,8 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
-import { Mic, Square, Play, Pause, Upload, Wand2, FileText, BarChart3, Loader2 } from 'lucide-react';
+import { Mic, Square, Play, Pause, Upload, Wand2, FileText, BarChart3, Loader2, Volume2 } from 'lucide-react';
 
-const RECORDING_STATES = { IDLE: 'idle', RECORDING: 'recording', PAUSED: 'paused' };
+const RECORDING_STATES = { IDLE: 'idle', RECORDING: 'recording' };
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const speechSupported = !!SpeechRecognition;
 
 export default function IntelliScore({ sessionId, onScoresReady }) {
   const [recState, setRecState] = useState(RECORDING_STATES.IDLE);
@@ -11,6 +14,8 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState('');
+  const [liveTranscript, setLiveTranscript] = useState('');
+  const [interimText, setInterimText] = useState('');
   const [analysis, setAnalysis] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -18,16 +23,21 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
   const [uploaded, setUploaded] = useState(false);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('record');
+  const [liveTranscriptionEnabled, setLiveTranscriptionEnabled] = useState(speechSupported);
+  const [transcribeMessage, setTranscribeMessage] = useState('');
 
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const audioRef = useRef(null);
   const timerRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const liveTranscriptRef = useRef('');
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (audioUrl) URL.revokeObjectURL(audioUrl);
+      stopSpeechRecognition();
     };
   }, [audioUrl]);
 
@@ -68,8 +78,62 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
     }
   };
 
+  const startSpeechRecognition = useCallback(() => {
+    if (!speechSupported || !liveTranscriptionEnabled) return;
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event) => {
+      let newFinal = '';
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          newFinal += result[0].transcript + ' ';
+        } else {
+          interim += result[0].transcript;
+        }
+      }
+      if (newFinal) {
+        liveTranscriptRef.current = (liveTranscriptRef.current + ' ' + newFinal).trim();
+        setLiveTranscript(liveTranscriptRef.current);
+      }
+      setInterimText(interim);
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        console.warn('Speech recognition error:', event.error);
+      }
+    };
+
+    recognition.onend = () => {
+      if (recState === RECORDING_STATES.RECORDING && recognitionRef.current) {
+        try { recognitionRef.current.start(); } catch {}
+      }
+    };
+
+    recognitionRef.current = recognition;
+    try { recognition.start(); } catch {}
+  }, [liveTranscriptionEnabled, recState]);
+
+  const stopSpeechRecognition = () => {
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+      recognitionRef.current = null;
+    }
+    setInterimText('');
+  };
+
   const startRecording = async () => {
     setError('');
+    setLiveTranscript('');
+    liveTranscriptRef.current = '';
+    setInterimText('');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
@@ -91,7 +155,11 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
       setRecState(RECORDING_STATES.RECORDING);
       setDuration(0);
       timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
-    } catch (err) {
+
+      if (liveTranscriptionEnabled && speechSupported) {
+        startSpeechRecognition();
+      }
+    } catch {
       setError('Microphone access denied. Please allow microphone access in your browser settings.');
     }
   };
@@ -104,6 +172,11 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
+    }
+    stopSpeechRecognition();
+
+    if (liveTranscriptRef.current.trim()) {
+      setTranscript(liveTranscriptRef.current.trim());
     }
   };
 
@@ -120,15 +193,26 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
   const handleUploadAndTranscribe = async () => {
     if (!audioBlob) return;
     setError('');
+    setTranscribeMessage('');
     setUploading(true);
     try {
       await api.uploadAudio(sessionId, audioBlob);
       setUploaded(true);
       setUploading(false);
 
+      if (transcript.trim()) {
+        await api.setTranscript(sessionId, transcript);
+        setTab('transcript');
+        return;
+      }
+
       setTranscribing(true);
       const res = await api.transcribeAudio(sessionId);
-      setTranscript(res.transcript);
+      if (res.auto_transcribed && res.transcript) {
+        setTranscript(res.transcript);
+      } else {
+        setTranscribeMessage(res.message || 'Auto-transcription is not available. Please type or paste the transcript manually.');
+      }
       setTranscribing(false);
       setTab('transcript');
     } catch (err) {
@@ -187,9 +271,9 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
       <div className="flex border-b border-gray-200">
         {[
           { id: 'record', label: 'Record', icon: Mic },
-          { id: 'transcript', label: 'Transcript', icon: FileText },
-          { id: 'analysis', label: 'Analysis', icon: BarChart3 },
-        ].map(({ id, label, icon: Icon }) => (
+          { id: 'transcript', label: 'Transcript', icon: FileText, badge: transcript.trim() ? '✓' : null },
+          { id: 'analysis', label: 'Analysis', icon: BarChart3, badge: analysis ? '✓' : null },
+        ].map(({ id, label, icon: Icon, badge }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
@@ -201,6 +285,7 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
           >
             <Icon className="w-4 h-4" />
             {label}
+            {badge && <span className="text-green-500 text-xs">{badge}</span>}
           </button>
         ))}
       </div>
@@ -217,8 +302,24 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
               {recState === RECORDING_STATES.IDLE && !audioBlob && (
                 <div className="space-y-4">
                   <p className="text-sm text-gray-500">
-                    Record the student's oral narrative retell. The audio will be transcribed and analyzed for narrative complexity.
+                    Record the student's oral narrative retell. {speechSupported ? 'Live transcription will capture speech in real-time.' : 'The audio can be transcribed after recording.'}
                   </p>
+
+                  {/* Live transcription toggle */}
+                  {speechSupported && (
+                    <div className="flex items-center justify-center gap-3">
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={liveTranscriptionEnabled}
+                          onChange={(e) => setLiveTranscriptionEnabled(e.target.checked)}
+                          className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <Volume2 className="w-4 h-4 text-purple-500" />
+                        <span className="text-gray-600">Live transcription</span>
+                      </label>
+                    </div>
+                  )}
 
                   {!micTested && (
                     <div className="space-y-2">
@@ -258,6 +359,11 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
                     <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
                     <span className="text-red-600 font-medium">Recording</span>
                     <span className="text-gray-500 font-mono">{formatTime(duration)}</span>
+                    {liveTranscriptionEnabled && (
+                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-[10px] font-medium">
+                        Live Transcribing
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex justify-center gap-3">
@@ -274,6 +380,20 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
                       ))}
                     </div>
                   </div>
+
+                  {/* Live transcript preview */}
+                  {liveTranscriptionEnabled && (liveTranscript || interimText) && (
+                    <div className="mx-auto max-w-lg bg-gray-50 rounded-lg p-3 text-left">
+                      <p className="text-xs text-gray-400 mb-1 font-medium">Live Transcript:</p>
+                      <p className="text-sm text-gray-700 leading-relaxed">
+                        {liveTranscript}
+                        {interimText && <span className="text-gray-400 italic"> {interimText}</span>}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-2">
+                        {(liveTranscript + ' ' + interimText).split(/\s+/).filter(Boolean).length} words
+                      </p>
+                    </div>
+                  )}
 
                   <button
                     onClick={stopRecording}
@@ -311,9 +431,21 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
                     </div>
                   </div>
 
+                  {/* Show live transcript result if available */}
+                  {transcript.trim() && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Volume2 className="w-4 h-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-800">Transcript captured via live transcription</span>
+                      </div>
+                      <p className="text-sm text-green-700 leading-relaxed line-clamp-3">{transcript}</p>
+                      <p className="text-xs text-green-600 mt-1">{transcript.split(/\s+/).filter(Boolean).length} words</p>
+                    </div>
+                  )}
+
                   <div className="flex justify-center gap-3">
                     <button
-                      onClick={() => { setAudioBlob(null); setAudioUrl(null); setUploaded(false); }}
+                      onClick={() => { setAudioBlob(null); setAudioUrl(null); setUploaded(false); setTranscript(''); setLiveTranscript(''); }}
                       className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
                     >
                       Re-record
@@ -327,6 +459,8 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
                         <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
                       ) : transcribing ? (
                         <><Loader2 className="w-4 h-4 animate-spin" /> Transcribing...</>
+                      ) : transcript.trim() ? (
+                        <><Upload className="w-4 h-4" /> Upload & Continue</>
                       ) : (
                         <><Upload className="w-4 h-4" /> Upload & Transcribe</>
                       )}
@@ -341,14 +475,33 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
         {/* Transcript Tab */}
         {tab === 'transcript' && (
           <div className="space-y-4">
+            {transcribeMessage && !transcript.trim() && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <FileText className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">Manual Transcript Required</p>
+                    <p className="text-xs text-amber-700 mt-1">{transcribeMessage}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {transcript.trim() && (
+              <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 flex items-center gap-2">
+                <span className="text-green-600 text-sm">&#10003;</span>
+                <span className="text-sm text-green-700">Transcript ready — {transcript.split(/\s+/).filter(Boolean).length} words. Review below, then analyze.</span>
+              </div>
+            )}
             <p className="text-sm text-gray-500">
-              Edit the transcript below or type one manually. The transcript will be analyzed for narrative language measures.
+              {transcript
+                ? 'Review and edit the transcript below, then click "Analyze" to score the narrative.'
+                : 'Type or paste the student\'s oral narrative retell below. Once entered, click "Analyze with IntelliScore" to generate scores.'}
             </p>
             <textarea
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
               rows={8}
-              placeholder="Type or paste the student's narrative retell transcript here..."
+              placeholder={'Type or paste the student\'s narrative retell transcript here...\n\nExample: The story was about a girl named Maya who lost her dog. She was very worried because he ran away. She looked everywhere around the neighborhood and asked her friends to help search. Finally they found him in the park playing with other dogs. Maya was so happy and relieved.'}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-500 resize-y"
             />
             <div className="flex items-center justify-between">

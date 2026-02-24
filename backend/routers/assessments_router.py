@@ -298,12 +298,13 @@ async def transcribe_session_audio(
     if not session.audio_file_path:
         raise HTTPException(400, "No audio file uploaded for this session")
 
-    transcript = await transcribe_audio(session.audio_file_path)
-    session.transcript = transcript
+    result = await transcribe_audio(session.audio_file_path)
+    if result.get("transcript"):
+        session.transcript = result["transcript"]
     session.intelliscore_used = True
     db.commit()
 
-    return {"transcript": transcript}
+    return result
 
 
 @router.post("/{session_id}/set-transcript")
