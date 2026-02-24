@@ -1,0 +1,459 @@
+{
+  "_meta": {
+    "source": "CUBED-3 Manual, Pages 126-128",
+    "description": "Benchmark cut points for CUBED-3 subtests. For each subtest/grade/time_of_year, thresholds define risk levels: score >= benchmark = 'benchmark' (or 'advanced'), score >= moderate = 'moderate', score < moderate = 'high'."
+  },
+  "NLM_RETELL_LISTENING": {
+    "PreK": {
+      "BOY": null,
+      "MOY": null,
+      "EOY": {"advanced": null, "benchmark": 10, "moderate": 6, "high": 4}
+    },
+    "K": {
+      "BOY": {"advanced": null, "benchmark": 10, "moderate": 7, "high": 4},
+      "MOY": {"advanced": null, "benchmark": 11, "moderate": 10, "high": 7},
+      "EOY": {"advanced": null, "benchmark": 13, "moderate": 11, "high": 8}
+    },
+    "1": {
+      "BOY": {"advanced": null, "benchmark": 15, "moderate": 12, "high": 5},
+      "MOY": {"advanced": null, "benchmark": 17, "moderate": 14, "high": 11},
+      "EOY": {"advanced": null, "benchmark": 20, "moderate": 16, "high": 12}
+    },
+    "2": {
+      "BOY": {"advanced": null, "benchmark": 23, "moderate": 18, "high": 9},
+      "MOY": {"advanced": null, "benchmark": 24, "moderate": 20, "high": 16},
+      "EOY": {"advanced": null, "benchmark": 26, "moderate": 23, "high": 17}
+    },
+    "3": {
+      "BOY": {"advanced": null, "benchmark": 30, "moderate": 25, "high": 18},
+      "MOY": {"advanced": null, "benchmark": 34, "moderate": 29, "high": 18},
+      "EOY": {"advanced": null, "benchmark": 39, "moderate": 34, "high": 19}
+    }
+  },
+  "NLM_QUESTIONS_LISTENING": {
+    "K": {
+      "BOY": {"benchmark": 14, "moderate": 7, "high": 0},
+      "MOY": {"benchmark": 18, "moderate": 14, "high": 0},
+      "EOY": {"benchmark": 18, "moderate": 15, "high": 0}
+    },
+    "1": {
+      "BOY": {"benchmark": 22, "moderate": 18, "high": 0},
+      "MOY": {"benchmark": 23, "moderate": 20, "high": 0},
+      "EOY": {"benchmark": 24, "moderate": 21, "high": 0}
+    },
+    "2": {
+      "BOY": {"benchmark": 24, "moderate": 19, "high": 0},
+      "MOY": {"benchmark": 25, "moderate": 21, "high": 0},
+      "EOY": {"benchmark": 26, "moderate": 22, "high": 0}
+    },
+    "3": {
+      "BOY": {"benchmark": 26, "moderate": 22, "high": 0},
+      "MOY": {"benchmark": 27, "moderate": 24, "high": 0},
+      "EOY": {"benchmark": 29, "moderate": 25, "high": 0}
+    }
+  },
+  "NLM_RETELL_READING": {
+    "1": {
+      "BOY": {"benchmark": 15, "moderate": 12, "high": 5},
+      "MOY": {"benchmark": 17, "moderate": 14, "high": 11},
+      "EOY": {"benchmark": 20, "moderate": 16, "high": 12}
+    },
+    "2": {
+      "BOY": {"benchmark": 23, "moderate": 18, "high": 9},
+      "MOY": {"benchmark": 24, "moderate": 20, "high": 16},
+      "EOY": {"benchmark": 26, "moderate": 23, "high": 17}
+    },
+    "3": {
+      "BOY": {"benchmark": 30, "moderate": 25, "high": 18},
+      "MOY": {"benchmark": 34, "moderate": 29, "high": 18},
+      "EOY": {"benchmark": 39, "moderate": 34, "high": 19}
+    },
+    "4": {
+      "BOY": {"benchmark": 30, "moderate": 30, "high": 15},
+      "MOY": {"benchmark": 31, "moderate": 31, "high": 17},
+      "EOY": {"benchmark": 32, "moderate": 32, "high": 20}
+    },
+    "5": {
+      "BOY": {"benchmark": 33, "moderate": 33, "high": 19},
+      "MOY": {"benchmark": 36, "moderate": 36, "high": 21},
+      "EOY": {"benchmark": 37, "moderate": 37, "high": 24}
+    },
+    "6": {
+      "BOY": {"benchmark": 37, "moderate": 37, "high": 24},
+      "MOY": {"benchmark": 38, "moderate": 38, "high": 27},
+      "EOY": {"benchmark": 40, "moderate": 40, "high": 29}
+    },
+    "7": {
+      "BOY": {"benchmark": 40, "moderate": 40, "high": 29},
+      "MOY": {"benchmark": 40, "moderate": 40, "high": 29},
+      "EOY": {"benchmark": 40, "moderate": 40, "high": 29}
+    },
+    "8": {
+      "BOY": {"benchmark": 40, "moderate": 40, "high": 29},
+      "MOY": {"benchmark": 40, "moderate": 40, "high": 29},
+      "EOY": {"benchmark": 40, "moderate": 40, "high": 29}
+    }
+  },
+  "NLM_QUESTIONS_READING": {
+    "1": {
+      "BOY": {"benchmark": 22, "moderate": 18, "high": 0},
+      "MOY": {"benchmark": 23, "moderate": 20, "high": 0},
+      "EOY": {"benchmark": 24, "moderate": 21, "high": 0}
+    },
+    "2": {
+      "BOY": {"benchmark": 24, "moderate": 19, "high": 0},
+      "MOY": {"benchmark": 25, "moderate": 21, "high": 0},
+      "EOY": {"benchmark": 26, "moderate": 22, "high": 0}
+    },
+    "3": {
+      "BOY": {"benchmark": 26, "moderate": 22, "high": 0},
+      "MOY": {"benchmark": 27, "moderate": 24, "high": 0},
+      "EOY": {"benchmark": 29, "moderate": 25, "high": 0}
+    },
+    "4": {
+      "BOY": {"benchmark": 20, "moderate": 12, "high": 0},
+      "MOY": {"benchmark": 20, "moderate": 12, "high": 0},
+      "EOY": {"benchmark": 21, "moderate": 13, "high": 0}
+    },
+    "5": {
+      "BOY": {"benchmark": 21, "moderate": 13, "high": 0},
+      "MOY": {"benchmark": 22, "moderate": 14, "high": 0},
+      "EOY": {"benchmark": 22, "moderate": 15, "high": 0}
+    },
+    "6": {
+      "BOY": {"benchmark": 22, "moderate": 15, "high": 0},
+      "MOY": {"benchmark": 23, "moderate": 16, "high": 0},
+      "EOY": {"benchmark": 23, "moderate": 17, "high": 0}
+    },
+    "7": {
+      "BOY": {"benchmark": 23, "moderate": 17, "high": 0},
+      "MOY": {"benchmark": 23, "moderate": 17, "high": 0},
+      "EOY": {"benchmark": 23, "moderate": 17, "high": 0}
+    },
+    "8": {
+      "BOY": {"benchmark": 23, "moderate": 17, "high": 0},
+      "MOY": {"benchmark": 23, "moderate": 17, "high": 0},
+      "EOY": {"benchmark": 23, "moderate": 17, "high": 0}
+    }
+  },
+  "DECODING_FLUENCY": {
+    "1": {
+      "BOY": {"benchmark": 31, "moderate": 10, "high": 0},
+      "MOY": {"benchmark": 34, "moderate": 22, "high": 0},
+      "EOY": {"benchmark": 66, "moderate": 48, "high": 0}
+    },
+    "2": {
+      "BOY": {"benchmark": 85, "moderate": 47, "high": 0},
+      "MOY": {"benchmark": 109, "moderate": 73, "high": 0},
+      "EOY": {"benchmark": 125, "moderate": 87, "high": 0}
+    },
+    "3": {
+      "BOY": {"benchmark": 109, "moderate": 73, "high": 0},
+      "MOY": {"benchmark": 118, "moderate": 89, "high": 0},
+      "EOY": {"benchmark": 118, "moderate": 93, "high": 0}
+    },
+    "4": {
+      "BOY": {"benchmark": 122, "moderate": 92, "high": 0},
+      "MOY": {"benchmark": 137, "moderate": 103, "high": 0},
+      "EOY": {"benchmark": 151, "moderate": 115, "high": 0}
+    },
+    "5": {
+      "BOY": {"benchmark": 139, "moderate": 101, "high": 0},
+      "MOY": {"benchmark": 150, "moderate": 114, "high": 0},
+      "EOY": {"benchmark": 159, "moderate": 123, "high": 0}
+    },
+    "6": {
+      "BOY": {"benchmark": 152, "moderate": 120, "high": 0},
+      "MOY": {"benchmark": 157, "moderate": 121, "high": 0},
+      "EOY": {"benchmark": 166, "moderate": 132, "high": 0}
+    },
+    "7": {
+      "BOY": {"benchmark": 156, "moderate": 138, "high": 0},
+      "MOY": {"benchmark": 165, "moderate": 138, "high": 0},
+      "EOY": {"benchmark": 177, "moderate": 138, "high": 0}
+    },
+    "8": {
+      "BOY": {"benchmark": 161, "moderate": 138, "high": 0},
+      "MOY": {"benchmark": 173, "moderate": 138, "high": 0},
+      "EOY": {"benchmark": 177, "moderate": 138, "high": 0}
+    }
+  },
+  "ACCURACY": {
+    "1": {
+      "BOY": {"benchmark": 65, "moderate": 50, "high": 0},
+      "MOY": {"benchmark": 80, "moderate": 65, "high": 0},
+      "EOY": {"benchmark": 91, "moderate": 80, "high": 0}
+    },
+    "2": {
+      "BOY": {"benchmark": 92, "moderate": 85, "high": 0},
+      "MOY": {"benchmark": 96, "moderate": 90, "high": 0},
+      "EOY": {"benchmark": 96, "moderate": 90, "high": 0}
+    },
+    "3": {
+      "BOY": {"benchmark": 96, "moderate": 92, "high": 0},
+      "MOY": {"benchmark": 97, "moderate": 93, "high": 0},
+      "EOY": {"benchmark": 97, "moderate": 93, "high": 0}
+    },
+    "4": {
+      "BOY": {"benchmark": 97, "moderate": 94, "high": 0},
+      "MOY": {"benchmark": 97, "moderate": 94, "high": 0},
+      "EOY": {"benchmark": 97, "moderate": 94, "high": 0}
+    },
+    "5": {
+      "BOY": {"benchmark": 97, "moderate": 95, "high": 0},
+      "MOY": {"benchmark": 98, "moderate": 95, "high": 0},
+      "EOY": {"benchmark": 98, "moderate": 95, "high": 0}
+    },
+    "6": {
+      "BOY": {"benchmark": 98, "moderate": 95, "high": 0},
+      "MOY": {"benchmark": 98, "moderate": 96, "high": 0},
+      "EOY": {"benchmark": 98, "moderate": 96, "high": 0}
+    },
+    "7": {
+      "BOY": {"benchmark": 98, "moderate": 96, "high": 0},
+      "MOY": {"benchmark": 98, "moderate": 96, "high": 0},
+      "EOY": {"benchmark": 98, "moderate": 96, "high": 0}
+    },
+    "8": {
+      "BOY": {"benchmark": 98, "moderate": 96, "high": 0},
+      "MOY": {"benchmark": 98, "moderate": 96, "high": 0},
+      "EOY": {"benchmark": 98, "moderate": 96, "high": 0}
+    }
+  },
+  "DDM_PA_PHONEME_SEGMENTATION": {
+    "PreK": {"EOY": {"benchmark": 14, "moderate": 8, "high": 0}},
+    "K": {
+      "BOY": {"benchmark": 14, "moderate": 8, "high": 0},
+      "MOY": {"benchmark": 27, "moderate": 20, "high": 0},
+      "EOY": {"benchmark": 29, "moderate": 24, "high": 0}
+    },
+    "1": {
+      "BOY": {"benchmark": 30, "moderate": 25, "high": 0},
+      "MOY": {"benchmark": 30, "moderate": 27, "high": 0},
+      "EOY": {"benchmark": 30, "moderate": 28, "high": 0}
+    }
+  },
+  "DDM_PA_PHONEME_BLENDING": {
+    "K": {
+      "MOY": {"benchmark": 2, "moderate": 1, "high": 0},
+      "EOY": {"benchmark": 3, "moderate": 2, "high": 0}
+    },
+    "1": {
+      "BOY": {"benchmark": 3, "moderate": 2, "high": 0},
+      "MOY": {"benchmark": 4, "moderate": 3, "high": 0},
+      "EOY": {"benchmark": 4, "moderate": 3, "high": 0}
+    }
+  },
+  "DDM_PA_FIRST_SOUNDS": {
+    "PreK": {"EOY": {"benchmark": 10, "moderate": 5, "high": 0}},
+    "K": {
+      "BOY": {"benchmark": 14, "moderate": 8, "high": 0},
+      "MOY": {"benchmark": 19, "moderate": 14, "high": 0},
+      "EOY": {"benchmark": 19, "moderate": 16, "high": 0}
+    },
+    "1": {
+      "BOY": {"benchmark": 19, "moderate": 17, "high": 0},
+      "MOY": {"benchmark": 19, "moderate": 18, "high": 0},
+      "EOY": {"benchmark": 19, "moderate": 18, "high": 0}
+    }
+  },
+  "DDM_PA_CONTINUOUS_BLENDING": {
+    "PreK": {"EOY": {"benchmark": 6, "moderate": 3, "high": 0}},
+    "K": {
+      "BOY": {"benchmark": 7, "moderate": 4, "high": 0},
+      "MOY": {"benchmark": 10, "moderate": 7, "high": 0},
+      "EOY": {"benchmark": 10, "moderate": 8, "high": 0}
+    },
+    "1": {
+      "BOY": {"benchmark": 10, "moderate": 8, "high": 0},
+      "MOY": {"benchmark": 10, "moderate": 9, "high": 0},
+      "EOY": {"benchmark": 10, "moderate": 9, "high": 0}
+    }
+  },
+  "DDM_PM_DELETION": {
+    "1": {
+      "BOY": {"benchmark": 2, "moderate": 1, "high": 0},
+      "MOY": {"benchmark": 2, "moderate": 1, "high": 0},
+      "EOY": {"benchmark": 3, "moderate": 2, "high": 0}
+    },
+    "2": {
+      "BOY": {"benchmark": 3, "moderate": 2, "high": 0},
+      "MOY": {"benchmark": 4, "moderate": 3, "high": 0},
+      "EOY": {"benchmark": 4, "moderate": 3, "high": 0}
+    }
+  },
+  "DDM_PM_ADDITION": {
+    "1": {
+      "BOY": {"benchmark": 2, "moderate": 1, "high": 0},
+      "MOY": {"benchmark": 2, "moderate": 1, "high": 0},
+      "EOY": {"benchmark": 3, "moderate": 2, "high": 0}
+    },
+    "2": {
+      "BOY": {"benchmark": 4, "moderate": 3, "high": 0},
+      "MOY": {"benchmark": 4, "moderate": 3, "high": 0},
+      "EOY": {"benchmark": 4, "moderate": 3, "high": 0}
+    }
+  },
+  "DDM_PM_SUBSTITUTION": {
+    "1": {
+      "MOY": {"benchmark": 2, "moderate": 1, "high": 0},
+      "EOY": {"benchmark": 3, "moderate": 2, "high": 0}
+    },
+    "2": {
+      "BOY": {"benchmark": 4, "moderate": 2, "high": 0},
+      "MOY": {"benchmark": 4, "moderate": 3, "high": 0},
+      "EOY": {"benchmark": 5, "moderate": 3, "high": 0}
+    }
+  },
+  "DDM_OM_IRREGULAR_WORDS": {
+    "K": {
+      "BOY": {"benchmark": 3, "moderate": 1, "high": 0},
+      "MOY": {"benchmark": 7, "moderate": 3, "high": 0},
+      "EOY": {"benchmark": 12, "moderate": 6, "high": 0}
+    },
+    "1": {
+      "BOY": {"benchmark": 12, "moderate": 6, "high": 0},
+      "MOY": {"benchmark": 30, "moderate": 18, "high": 0},
+      "EOY": {"benchmark": 35, "moderate": 24, "high": 0}
+    },
+    "2": {
+      "BOY": {"benchmark": 40, "moderate": 30, "high": 0},
+      "MOY": {"benchmark": 40, "moderate": 33, "high": 0},
+      "EOY": {"benchmark": 40, "moderate": 35, "high": 0}
+    }
+  },
+  "DDM_OM_LETTER_SOUNDS": {
+    "PreK": {
+      "BOY": {"benchmark": 5, "moderate": 2, "high": 0},
+      "MOY": {"benchmark": 5, "moderate": 3, "high": 0},
+      "EOY": {"benchmark": 15, "moderate": 8, "high": 0}
+    },
+    "K": {
+      "BOY": {"benchmark": 30, "moderate": 15, "high": 0},
+      "MOY": {"benchmark": 30, "moderate": 20, "high": 0},
+      "EOY": {"benchmark": 35, "moderate": 25, "high": 0}
+    },
+    "1": {
+      "BOY": {"benchmark": 43, "moderate": 30, "high": 0},
+      "MOY": {"benchmark": 50, "moderate": 38, "high": 0},
+      "EOY": {"benchmark": 55, "moderate": 42, "high": 0}
+    }
+  },
+  "DDM_DI_CLOSED_SYLLABLES": {
+    "K": {
+      "MOY": {"benchmark": 3, "moderate": 1, "high": 0},
+      "EOY": {"benchmark": 5, "moderate": 3, "high": 0}
+    },
+    "1": {
+      "BOY": {"benchmark": 5, "moderate": 3, "high": 0},
+      "MOY": {"benchmark": 6, "moderate": 4, "high": 0},
+      "EOY": {"benchmark": 6, "moderate": 5, "high": 0}
+    },
+    "2": {
+      "BOY": {"benchmark": 6, "moderate": 5, "high": 0},
+      "MOY": {"benchmark": 6, "moderate": 5, "high": 0},
+      "EOY": {"benchmark": 6, "moderate": 5, "high": 0}
+    }
+  },
+  "DDM_DI_VCE": {
+    "K": {
+      "EOY": {"benchmark": 2, "moderate": 1, "high": 0}
+    },
+    "1": {
+      "BOY": {"benchmark": 3, "moderate": 1, "high": 0},
+      "MOY": {"benchmark": 5, "moderate": 3, "high": 0},
+      "EOY": {"benchmark": 6, "moderate": 4, "high": 0}
+    },
+    "2": {
+      "BOY": {"benchmark": 6, "moderate": 4, "high": 0},
+      "MOY": {"benchmark": 6, "moderate": 5, "high": 0},
+      "EOY": {"benchmark": 6, "moderate": 5, "high": 0}
+    }
+  },
+  "DDM_DI_BASIC_AFFIXES": {
+    "1": {
+      "BOY": {"benchmark": 2, "moderate": 1, "high": 0},
+      "MOY": {"benchmark": 4, "moderate": 2, "high": 0},
+      "EOY": {"benchmark": 5, "moderate": 3, "high": 0}
+    },
+    "2": {
+      "BOY": {"benchmark": 5, "moderate": 3, "high": 0},
+      "MOY": {"benchmark": 6, "moderate": 4, "high": 0},
+      "EOY": {"benchmark": 6, "moderate": 5, "high": 0}
+    }
+  },
+  "DDM_DI_VOWEL_TEAMS": {
+    "1": {
+      "MOY": {"benchmark": 3, "moderate": 1, "high": 0},
+      "EOY": {"benchmark": 4, "moderate": 2, "high": 0}
+    },
+    "2": {
+      "BOY": {"benchmark": 5, "moderate": 3, "high": 0},
+      "MOY": {"benchmark": 5, "moderate": 4, "high": 0},
+      "EOY": {"benchmark": 6, "moderate": 4, "high": 0}
+    }
+  },
+  "DDM_DI_VOWEL_R": {
+    "1": {
+      "MOY": {"benchmark": 3, "moderate": 1, "high": 0},
+      "EOY": {"benchmark": 4, "moderate": 2, "high": 0}
+    },
+    "2": {
+      "BOY": {"benchmark": 5, "moderate": 3, "high": 0},
+      "MOY": {"benchmark": 6, "moderate": 4, "high": 0},
+      "EOY": {"benchmark": 6, "moderate": 4, "high": 0}
+    }
+  },
+  "DDM_DI_ADVANCED_AFFIXES": {
+    "2": {
+      "BOY": {"benchmark": 3, "moderate": 1, "high": 0},
+      "MOY": {"benchmark": 4, "moderate": 2, "high": 0},
+      "EOY": {"benchmark": 4, "moderate": 3, "high": 0}
+    },
+    "3": {
+      "BOY": {"benchmark": 5, "moderate": 3, "high": 0},
+      "MOY": {"benchmark": 5, "moderate": 3, "high": 0},
+      "EOY": {"benchmark": 5, "moderate": 4, "high": 0}
+    }
+  },
+  "DDM_DI_COMPLEX_VOWELS": {
+    "2": {
+      "BOY": {"benchmark": 3, "moderate": 1, "high": 0},
+      "MOY": {"benchmark": 4, "moderate": 2, "high": 0},
+      "EOY": {"benchmark": 5, "moderate": 3, "high": 0}
+    },
+    "3": {
+      "BOY": {"benchmark": 5, "moderate": 3, "high": 0},
+      "MOY": {"benchmark": 6, "moderate": 4, "high": 0},
+      "EOY": {"benchmark": 7, "moderate": 5, "high": 0}
+    }
+  },
+  "DDM_DI_ADVANCED_WORD_FORMS": {
+    "2": {
+      "MOY": {"benchmark": 3, "moderate": 1, "high": 0},
+      "EOY": {"benchmark": 4, "moderate": 2, "high": 0}
+    },
+    "3": {
+      "BOY": {"benchmark": 4, "moderate": 2, "high": 0},
+      "MOY": {"benchmark": 5, "moderate": 3, "high": 0},
+      "EOY": {"benchmark": 5, "moderate": 3, "high": 0}
+    }
+  },
+  "DDM_DI_WORDS_IN_CONTEXT": {
+    "2": {
+      "EOY": {"benchmark": 3, "moderate": 1, "high": 0}
+    },
+    "3": {
+      "BOY": {"benchmark": 3, "moderate": 2, "high": 0},
+      "MOY": {"benchmark": 4, "moderate": 2, "high": 0},
+      "EOY": {"benchmark": 4, "moderate": 3, "high": 0}
+    }
+  },
+  "COMPOSITE": {
+    "PreK": {"EOY": {"benchmark": 45, "moderate": 44}},
+    "K": {"EOY": {"benchmark": 45, "moderate": 44}},
+    "1": {"BOY": {"benchmark": 188, "moderate": 187}},
+    "2": {"BOY": {"benchmark": 311, "moderate": 310}},
+    "3": {"BOY": {"benchmark": 317, "moderate": 316}}
+  }
+}
