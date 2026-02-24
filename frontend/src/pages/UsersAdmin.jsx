@@ -111,6 +111,12 @@ export default function UsersAdmin() {
         )}
       </div>
 
+      {/* Admin Settings */}
+      <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Organization Settings</h2>
+        <IntelliScoreToggle />
+      </div>
+
       {showAdd && <AddUserModal onClose={() => setShowAdd(false)} onDone={() => { setShowAdd(false); load(); }} />}
       {showImport && <ImportUsersModal onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); load(); }} />}
       {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onDone={() => { setEditUser(null); load(); }} />}
@@ -234,6 +240,41 @@ function ImportUsersModal({ onClose, onDone }) {
           {loading ? 'Importing...' : 'Import Users'}
         </button>
       </div>
+    </div>
+  );
+}
+
+function IntelliScoreToggle() {
+  const [enabled, setEnabled] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.getMe().then(me => {
+      if (me.organization?.intelliscore_enabled !== undefined) {
+        setEnabled(me.organization.intelliscore_enabled);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const toggle = async () => {
+    setSaving(true);
+    try {
+      await api.updateOrgSettings({ intelliscore_enabled: !enabled });
+      setEnabled(!enabled);
+    } catch { /* ignore */ }
+    setSaving(false);
+  };
+
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="font-medium text-gray-900 text-sm">IntelliScore AI Analysis</p>
+        <p className="text-xs text-gray-500">Enable or disable IntelliScore for all users in your organization.</p>
+      </div>
+      <button onClick={toggle} disabled={saving}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-purple-600' : 'bg-gray-300'}`}>
+        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+      </button>
     </div>
   );
 }

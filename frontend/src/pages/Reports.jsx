@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
-import { BarChart3, Download, Filter, Users, Plus, X } from 'lucide-react';
+import { BarChart3, Download, Filter, Users, Plus, X, Printer } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-  PieChart, Pie, Cell,
+  PieChart, Pie, Cell, ReferenceLine,
 } from 'recharts';
 
 const RISK_COLORS = { low_risk: '#22c55e', moderate_risk: '#f59e0b', high_risk: '#ef4444' };
@@ -63,16 +63,28 @@ function shortLabel(key) {
 
 export default function Reports() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState('summary');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const initialRiskFilter = searchParams.get('riskFilter') || '';
+  const initialTab = searchParams.get('tab') || (initialRiskFilter ? 'table' : 'summary');
+
+  const [tab, setTab] = useState(initialTab);
   const [riskData, setRiskData] = useState([]);
   const [riskTable, setRiskTable] = useState([]);
-  const [filters, setFilters] = useState({ academic_year: '2025-2026', time_of_year: '', grade: '', school: '', group_id: '' });
-  const [riskFilter, setRiskFilter] = useState('');
+  const [filters, setFilters] = useState({ academic_year: '2025-2026', time_of_year: '', grade: '', school: '', group_id: '', examiner_id: '' });
+  const [riskFilter, setRiskFilter] = useState(initialRiskFilter);
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState([]);
   const [schools, setSchools] = useState([]);
+  const [examiners, setExaminers] = useState([]);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+
+  useEffect(() => {
+    if (searchParams.get('riskFilter') || searchParams.get('tab')) {
+      setSearchParams({}, { replace: true });
+    }
+  }, []);
 
   useEffect(() => {
     api.listGroups().then(setGroups).catch(() => {});
@@ -80,6 +92,9 @@ export default function Reports() {
       const s = [...new Set(students.filter(st => st.school).map(st => st.school))].sort();
       setSchools(s);
     }).catch(() => {});
+    api.listUsers({ status: 'active' }).then(users => {
+      setExaminers(users.map(u => ({ id: u.id, name: `${u.first_name} ${u.last_name}` })));
+    }).catch(() => setExaminers([]));
   }, []);
 
   const load = async () => {
@@ -102,10 +117,18 @@ export default function Reports() {
 
   const chartData = riskData.map((r) => ({
     name: shortLabel(r.subtest),
+    subtestKey: r.subtest,
     Benchmark: r.low_risk,
     Moderate: r.moderate_risk,
     'High Risk': r.high_risk,
   }));
+
+  const handleBarClick = (data, riskLevel) => {
+    if (data?.subtestKey) {
+      setRiskFilter(`${data.subtestKey}:${riskLevel}`);
+      setTab('table');
+    }
+  };
 
   const tableColumns = useMemo(() => {
     const allKeys = new Set();
@@ -145,6 +168,18 @@ export default function Reports() {
           >
             <Download className="w-4 h-4" /> Detailed CSV
           </button>
+          <button
+            onClick={() => handleExport('risk_by_grade')}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <Download className="w-4 h-4" /> Risk by Grade
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <Printer className="w-4 h-4" /> PDF / Print
+          </button>
         </div>
       </div>
 
@@ -177,11 +212,24 @@ export default function Reports() {
             <option value="">All Groups</option>
             {groups.map((g) => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
           </select>
-          {riskFilter && (
-            <button onClick={() => setRiskFilter('')} className="flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-200">
-              Risk: {riskFilter.split(':')[1]} <X className="w-3 h-3" />
-            </button>
-          )}
+          <select value={filters.examiner_id} onChange={(e) => setFilters((p) => ({ ...p, examiner_id: e.target.value }))} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500">
+            <option value="">All Examiners</option>
+            {examiners.map((e) => <option key={e.id} value={String(e.id)}>{e.name}</option>)}
+          </select>
+          {riskFilter && (() => {
+            const [filterSubtest, filterLevel] = riskFilter.split(':');
+            const levelColor = filterLevel === 'high' ? 'bg-red-100 text-red-700 hover:bg-red-200'
+              : filterLevel === 'moderate' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+              : 'bg-green-100 text-green-700 hover:bg-green-200';
+            return (
+              <button onClick={() => setRiskFilter('')} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${levelColor}`}>
+                <span className="capitalize">{filterLevel}</span>
+                <span className="opacity-60">on</span>
+                <span>{shortLabel(filterSubtest)}</span>
+                <X className="w-3 h-3 ml-0.5" />
+              </button>
+            );
+          })()}
         </div>
       </div>
 
@@ -201,7 +249,7 @@ export default function Reports() {
             tab === 'table' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
           }`}
         >
-          Student Table
+          Student Table{!loading && riskTable.length > 0 ? ` (${riskTable.length})` : ''}
         </button>
       </div>
 
@@ -209,23 +257,65 @@ export default function Reports() {
         <div className="flex items-center justify-center h-48">
           <div className="animate-spin w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full" />
         </div>
-      ) : tab === 'summary' ? (
+      ) : tab === 'table' && (riskFilter || filters.grade || filters.school || filters.group_id || filters.examiner_id || filters.time_of_year) ? (
+        <TableContextBanner
+          riskFilter={riskFilter}
+          filters={filters}
+          riskTable={riskTable}
+          groups={groups}
+          examiners={examiners}
+          onClearRisk={() => setRiskFilter('')}
+          onClearAll={() => { setRiskFilter(''); setFilters({ academic_year: filters.academic_year, time_of_year: '', grade: '', school: '', group_id: '', examiner_id: '' }); }}
+        />
+      ) : null}
+
+      {loading ? null : tab === 'summary' ? (
         <div className="space-y-6">
           {/* Bar Chart */}
           {chartData.length > 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Risk Distribution by Subtest</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Risk Distribution by Subtest</h2>
+              <p className="text-xs text-gray-400 mb-4">Click any bar segment to drill down into that subtest and risk level</p>
               <div style={{ height: Math.max(320, chartData.length * 36 + 60) }}>
                 <ResponsiveContainer>
-                  <BarChart data={chartData} layout="vertical">
+                  <BarChart data={chartData} layout="vertical" style={{ cursor: 'pointer' }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={160} tick={{ fontSize: 11 }} />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      width={160}
+                      tick={{ fontSize: 11, cursor: 'pointer' }}
+                      onClick={(e) => {
+                        const match = chartData.find(d => d.name === e.value);
+                        if (match) { setRiskFilter(`${match.subtestKey}:high`); setTab('table'); }
+                      }}
+                    />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="Benchmark" stackId="a" fill={RISK_COLORS.low_risk} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="Moderate" stackId="a" fill={RISK_COLORS.moderate_risk} />
-                    <Bar dataKey="High Risk" stackId="a" fill={RISK_COLORS.high_risk} radius={[0, 4, 4, 0]} />
+                    <Bar
+                      dataKey="Benchmark"
+                      stackId="a"
+                      fill={RISK_COLORS.low_risk}
+                      radius={[0, 0, 0, 0]}
+                      style={{ cursor: 'pointer' }}
+                      onClick={(data) => handleBarClick(data, 'benchmark')}
+                    />
+                    <Bar
+                      dataKey="Moderate"
+                      stackId="a"
+                      fill={RISK_COLORS.moderate_risk}
+                      style={{ cursor: 'pointer' }}
+                      onClick={(data) => handleBarClick(data, 'moderate')}
+                    />
+                    <Bar
+                      dataKey="High Risk"
+                      stackId="a"
+                      fill={RISK_COLORS.high_risk}
+                      radius={[0, 4, 4, 0]}
+                      style={{ cursor: 'pointer' }}
+                      onClick={(data) => handleBarClick(data, 'high')}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -246,8 +336,12 @@ export default function Reports() {
               ].filter((d) => d.value > 0);
 
               return (
-                <div key={r.subtest} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-                  <h3 className="font-semibold text-gray-900 text-sm mb-1">
+                <div
+                  key={r.subtest}
+                  className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md hover:border-primary-300 transition-all cursor-pointer"
+                  onClick={() => { setRiskFilter(`${r.subtest}:high`); setTab('table'); }}
+                >
+                  <h3 className="font-semibold text-gray-900 text-sm mb-1 hover:text-primary-600 transition-colors">
                     {shortLabel(r.subtest)}
                   </h3>
                   <p className="text-xs text-gray-400 mb-3">{r.total_students} students assessed</p>
@@ -310,8 +404,38 @@ export default function Reports() {
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             {riskTable.length === 0 || tableColumns.length === 0 ? (
-              <div className="p-12 text-center text-gray-400">No data available.</div>
+              <div className="p-12 text-center text-gray-400">
+                <Users className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+                <p className="font-medium">No students match the current filters</p>
+                {riskFilter && (
+                  <button onClick={() => setRiskFilter('')} className="text-primary-600 text-sm mt-2 hover:underline">
+                    Clear risk filter to show all students
+                  </button>
+                )}
+              </div>
             ) : (
+              <>
+              {/* Table header bar with row count */}
+              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700">
+                    {riskTable.length} student{riskTable.length !== 1 ? 's' : ''}
+                  </span>
+                  {riskFilter && (
+                    <span className="text-sm text-gray-400">
+                      &middot; filtered by <span className="font-medium text-gray-600">{shortLabel(riskFilter.split(':')[0])}</span>
+                      {' '}&rarr;{' '}
+                      <span className={`font-semibold ${
+                        riskFilter.split(':')[1] === 'high' ? 'text-red-600' :
+                        riskFilter.split(':')[1] === 'moderate' ? 'text-amber-600' :
+                        'text-green-600'
+                      }`}>{riskFilter.split(':')[1]}</span>
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs text-gray-400">{tableColumns.length} subtest{tableColumns.length !== 1 ? 's' : ''} shown</span>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b">
@@ -329,10 +453,11 @@ export default function Reports() {
                       {tableColumns.map((key) => {
                         const label = formatLabel(key);
                         const lines = label.split('\n');
+                        const isFilteredCol = riskFilter && riskFilter.split(':')[0] === key;
                         return (
-                          <th key={key} className="text-center px-2 py-2 font-medium text-gray-500 min-w-[80px]">
+                          <th key={key} className={`text-center px-2 py-2 font-medium min-w-[80px] ${isFilteredCol ? 'bg-primary-50 text-primary-700' : 'text-gray-500'}`}>
                             <div className="flex flex-col items-center leading-tight">
-                              <span className="text-[10px] font-semibold text-gray-400">{lines[0]}</span>
+                              <span className={`text-[10px] font-semibold ${isFilteredCol ? 'text-primary-500' : 'text-gray-400'}`}>{lines[0]}</span>
                               {lines[1] && <span className="text-xs">{lines[1]}</span>}
                             </div>
                           </th>
@@ -363,14 +488,19 @@ export default function Reports() {
                           <td className="px-3 py-2.5 text-gray-600">{row.grade}</td>
                           {tableColumns.map((key) => {
                             const risk = row.risks?.[key];
+                            const isFilteredCol = riskFilter && riskFilter.split(':')[0] === key;
                             return (
-                              <td key={key} className="px-2 py-2.5 text-center">
+                              <td key={key} className={`px-2 py-2.5 text-center ${isFilteredCol ? 'bg-primary-50/30' : ''}`}>
                                 {risk ? (
-                                  <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium ${RISK_BADGE[risk] || 'bg-gray-100 text-gray-500'}`}>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setRiskFilter(`${key}:${risk}`); }}
+                                    className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary-300 transition-all ${RISK_BADGE[risk] || 'bg-gray-100 text-gray-500'}`}
+                                    title={`Filter by ${risk} risk on ${shortLabel(key)}`}
+                                  >
                                     {risk}
-                                  </span>
+                                  </button>
                                 ) : (
-                                  <span className="text-gray-300">—</span>
+                                  <span className="text-gray-400 text-[11px]">N/A</span>
                                 )}
                               </td>
                             );
@@ -381,6 +511,17 @@ export default function Reports() {
                   </tbody>
                 </table>
               </div>
+              {/* Table footer with total count */}
+              <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+                <span className="text-xs text-gray-500">
+                  Showing {riskTable.length} of {riskTable.length} student{riskTable.length !== 1 ? 's' : ''}
+                  {riskFilter && ' (filtered)'}
+                </span>
+                {selectedStudentIds.length > 0 && (
+                  <span className="text-xs text-primary-600 font-medium">{selectedStudentIds.length} selected</span>
+                )}
+              </div>
+              </>
             )}
           </div>
         </div>
@@ -399,6 +540,77 @@ export default function Reports() {
         )}
         </>
       )}
+    </div>
+  );
+}
+
+function TableContextBanner({ riskFilter, filters, riskTable, groups, examiners, onClearRisk, onClearAll }) {
+  const parts = riskFilter ? riskFilter.split(':') : [];
+  const subtestName = parts[0] ? shortLabel(parts[0]) : '';
+  const riskLevel = parts[1] || '';
+  const riskColor = riskLevel === 'high' ? 'text-red-700 bg-red-50 border-red-200'
+    : riskLevel === 'moderate' ? 'text-amber-700 bg-amber-50 border-amber-200'
+    : riskLevel === 'benchmark' ? 'text-green-700 bg-green-50 border-green-200'
+    : 'text-gray-700 bg-gray-50 border-gray-200';
+
+  const activeFilters = [];
+  if (filters.time_of_year) activeFilters.push(`Period: ${filters.time_of_year}`);
+  if (filters.grade) activeFilters.push(`Grade: ${filters.grade}`);
+  if (filters.school) activeFilters.push(`School: ${filters.school}`);
+  if (filters.group_id) {
+    const grp = groups.find(g => String(g.id) === filters.group_id);
+    activeFilters.push(`Group: ${grp?.name || filters.group_id}`);
+  }
+  if (filters.examiner_id) {
+    const ex = examiners.find(e => String(e.id) === filters.examiner_id);
+    activeFilters.push(`Examiner: ${ex?.name || filters.examiner_id}`);
+  }
+
+  return (
+    <div className={`rounded-xl border p-4 ${riskFilter ? riskColor : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          {riskFilter ? (
+            <>
+              <p className="font-semibold text-sm">
+                Showing students at <span className="capitalize">{riskLevel}</span> risk
+                {subtestName && <> on <span className="underline decoration-dotted">{subtestName}</span></>}
+              </p>
+              <p className="text-xs mt-1 opacity-75">
+                {riskTable.length} student{riskTable.length !== 1 ? 's' : ''} match this filter
+                {activeFilters.length > 0 && <> &middot; {activeFilters.join(' &middot; ')}</>}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold text-sm">
+                Filtered student risk table
+              </p>
+              <p className="text-xs mt-1 opacity-75">
+                {riskTable.length} student{riskTable.length !== 1 ? 's' : ''} &middot; {activeFilters.join(' · ')}
+              </p>
+            </>
+          )}
+        </div>
+        <div className="flex gap-2 flex-shrink-0">
+          {riskFilter && (
+            <button
+              onClick={onClearRisk}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white/80 border border-current/20 rounded-lg text-xs font-medium hover:bg-white transition-colors"
+            >
+              <X className="w-3 h-3" /> Clear risk filter
+            </button>
+          )}
+          {(riskFilter || activeFilters.length > 0) && (
+            <button
+              onClick={onClearAll}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white/80 border border-current/20 rounded-lg text-xs font-medium hover:bg-white transition-colors"
+            >
+              Clear all filters
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

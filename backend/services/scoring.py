@@ -114,4 +114,45 @@ def get_available_subtests() -> list[dict]:
         {"id": "DDM_DI", "name": "DDM Decoding Inventory", "category": "DDM", "grades": ["K", "1", "2", "3", "4"],
          "targets": ["CLOSED_SYLLABLES", "VCE", "BASIC_AFFIXES", "VOWEL_TEAMS", "VOWEL_R_CONTROLLED",
                       "ADVANCED_AFFIXES", "COMPLEX_VOWELS", "ADVANCED_WORD_FORMS"]},
+        {"id": "PERSONAL_GENERATION", "name": "Personal Generation", "category": "NLM", "grades": ["PreK", "K", "1", "2", "3", "4", "5", "6", "7", "8"],
+         "targets": ["ORAL_STORY", "WRITTEN_STORY"]},
     ]
+
+
+def get_next_subtest_recommendation(grade: str, completed_subtests: list[str], risk_results: dict) -> list[dict]:
+    """
+    Administration flowchart logic: recommend which subtest to administer next.
+    Based on the CUBED-3 decision tree:
+    1. Start with NLM Listening (all grades)
+    2. If grade 1+, administer NLM Reading
+    3. If NLM Reading Decoding Fluency is moderate/high risk, administer DDM subtests
+    4. For PreK/K, administer DDM PA and DDM OM based on age
+    """
+    suggestions = []
+    grade_num = {"PreK": -1, "K": 0}.get(grade, int(grade) if grade.isdigit() else 0)
+
+    if "NLM_LISTENING" not in completed_subtests:
+        suggestions.append({"subtest": "NLM_LISTENING", "reason": "Start: NLM Listening is recommended for all students."})
+        return suggestions
+
+    if grade_num >= 1 and "NLM_READING" not in completed_subtests:
+        suggestions.append({"subtest": "NLM_READING", "reason": "NLM Listening complete — administer NLM Reading for grade 1+."})
+        return suggestions
+
+    fluency_risk = risk_results.get("DECODING_FLUENCY")
+    needs_ddm = fluency_risk in ("moderate", "high") or grade_num <= 0
+
+    if needs_ddm:
+        if grade_num <= 2 and "DDM_PA" not in completed_subtests:
+            suggestions.append({"subtest": "DDM_PA", "reason": "Administer Phonemic Awareness (grades PreK-2)."})
+        if grade_num <= 2 and "DDM_PM" not in completed_subtests:
+            suggestions.append({"subtest": "DDM_PM", "reason": "Administer Phoneme Manipulation (grades 1-2)." if grade_num >= 1 else "Skip — PM starts at grade 1."})
+        if grade_num <= 2 and "DDM_OM" not in completed_subtests:
+            suggestions.append({"subtest": "DDM_OM", "reason": "Administer Orthographic Mapping (grades PreK-2)."})
+        if grade_num <= 4 and "DDM_DI" not in completed_subtests:
+            suggestions.append({"subtest": "DDM_DI", "reason": "Administer Decoding Inventory (grades K-4)."})
+
+    if not suggestions:
+        suggestions.append({"subtest": None, "reason": "All recommended subtests have been administered."})
+
+    return suggestions

@@ -61,6 +61,8 @@ export const api = {
   createGroup: (data) => request('/students/groups', { method: 'POST', body: JSON.stringify(data) }),
   addStudentsToGroup: (groupId, ids) =>
     request(`/students/groups/${groupId}/add-students`, { method: 'POST', body: JSON.stringify(ids) }),
+  getGroupStudents: (groupId) => request(`/students/groups/${groupId}/students`),
+  deleteGroup: (groupId) => request(`/students/groups/${groupId}`, { method: 'DELETE' }),
 
   // Assessments
   getSubtests: () => request('/assessments/subtests'),
@@ -71,6 +73,9 @@ export const api = {
   getTestSession: (sessionId) => request(`/assessments/${sessionId}`),
   getRecommendations: (sessionId) => request(`/assessments/${sessionId}/recommendations`),
   getStudentHistory: (studentId) => request(`/assessments/student/${studentId}/history`),
+  getNextSubtest: (studentId, academicYear = '2025-2026') =>
+    request(`/assessments/student/${studentId}/next-subtest?academic_year=${academicYear}`),
+  editScore: (sessionId, scoreId, data) => request(`/assessments/${sessionId}/scores/${scoreId}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   // IntelliScore
   uploadAudio: async (sessionId, blob) => {
@@ -113,6 +118,9 @@ export const api = {
     return res.json();
   },
 
+  // Organization settings
+  updateOrgSettings: (data) => request('/users/org-settings', { method: 'PUT', body: JSON.stringify(data) }),
+
   // Licenses
   listLicenses: () => request('/licenses/'),
 
@@ -124,6 +132,9 @@ export const api = {
   getStories: (grade, timeOfYear, assessmentType = 'benchmark') =>
     request(`/stimulus/stories/${grade}/${timeOfYear}?assessment_type=${assessmentType}`),
   getDdmGrid: (target) => request(`/stimulus/ddm-grid/${target}`),
+
+  // Benchmarks
+  getBenchmarks: () => request('/assessments/benchmarks'),
 
   // Reports
   riskSummary: (params = {}) => {

@@ -6,7 +6,7 @@ from database import get_db
 from models import User, Student, TestSession, Score, License
 from schemas import TestSessionCreate, TestSessionOut, ScoreCreate, ScoreUpdate, ScoreOut
 from auth import get_current_user
-from services.scoring import classify_risk, get_recommendation, get_available_subtests
+from services.scoring import classify_risk, get_recommendation, get_available_subtests, get_next_subtest_recommendation
 from services.intelliscore import save_audio, transcribe_audio, analyze_transcript
 
 router = APIRouter(prefix="/api/assessments", tags=["assessments"])
@@ -15,6 +15,12 @@ router = APIRouter(prefix="/api/assessments", tags=["assessments"])
 @router.get("/subtests")
 def list_subtests():
     return get_available_subtests()
+
+
+@router.get("/benchmarks")
+def get_benchmarks():
+    from services.scoring import _load_benchmarks
+    return _load_benchmarks()
 
 
 @router.post("/start", response_model=TestSessionOut)
@@ -170,6 +176,30 @@ def get_recommendations(
     return recs
 
 
+@router.get("/student/{student_id}/next-subtest")
+def next_subtest(
+    student_id: int,
+    academic_year: str = "2025-2026",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(404, "Student not found")
+    completed = (
+        db.query(TestSession)
+        .filter(TestSession.student_id == student_id, TestSession.is_complete == True, TestSession.academic_year == academic_year)
+        .all()
+    )
+    completed_subtests = list(set(s.subtest for s in completed))
+    risk_results = {}
+    for s in completed:
+        for score in s.scores:
+            if score.risk_level:
+                risk_results[score.target] = score.risk_level
+    return get_next_subtest_recommendation(student.grade, completed_subtests, risk_results)
+
+
 @router.get("/student/{student_id}/history")
 def get_student_test_history(
     student_id: int,
@@ -236,6 +266,24 @@ async def upload_audio(
     db.commit()
 
     return {"file_path": file_path, "message": "Audio uploaded successfully"}
+
+
+@router.get("/{session_id}/audio")
+def get_audio(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from fastapi.responses import FileResponse
+    import os
+    session = db.query(TestSession).filter(TestSession.id == session_id).first()
+    if not session:
+        raise HTTPException(404, "Test session not found")
+    if not session.audio_file_path or not os.path.exists(session.audio_file_path):
+        raise HTTPException(404, "No audio file available")
+    if session.audio_expires_at and session.audio_expires_at < datetime.datetime.utcnow():
+        raise HTTPException(410, "Audio file has expired")
+    return FileResponse(session.audio_file_path, media_type="audio/webm")
 
 
 @router.post("/{session_id}/transcribe")

@@ -128,8 +128,19 @@ class TestSessionOut(BaseModel):
     intelliscore_used: bool
     created_at: datetime
     completed_at: Optional[datetime]
+    has_audio: bool = False
+    audio_expires_at: Optional[datetime] = None
     scores: List["ScoreOut"] = []
     model_config = {"from_attributes": True}
+
+    @classmethod
+    def model_validate(cls, obj, **kwargs):
+        inst = super().model_validate(obj, **kwargs)
+        if hasattr(obj, 'audio_file_path') and obj.audio_file_path:
+            inst.has_audio = True
+        if hasattr(obj, 'audio_expires_at') and obj.audio_expires_at:
+            inst.audio_expires_at = obj.audio_expires_at
+        return inst
 
 
 # --- Score ---

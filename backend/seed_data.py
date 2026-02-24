@@ -541,6 +541,8 @@ def _seed(db):
                     .count()
                 )
                 lic.used = unique
+                headroom = random.randint(50, 300)
+                lic.total = max(lic.total, unique + headroom)
     db.commit()
     print("  License usage updated.")
 

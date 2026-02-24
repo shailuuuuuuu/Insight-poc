@@ -449,6 +449,48 @@
       "EOY": {"benchmark": 4, "moderate": 3, "high": 0}
     }
   },
+  "PROSODY": {
+    "1": {
+      "BOY": {"benchmark": 2, "moderate": 1, "high": 0},
+      "MOY": {"benchmark": 2, "moderate": 1, "high": 0},
+      "EOY": {"benchmark": 3, "moderate": 2, "high": 0}
+    },
+    "2": {
+      "BOY": {"benchmark": 2, "moderate": 1, "high": 0},
+      "MOY": {"benchmark": 3, "moderate": 2, "high": 0},
+      "EOY": {"benchmark": 3, "moderate": 2, "high": 0}
+    },
+    "3": {
+      "BOY": {"benchmark": 3, "moderate": 2, "high": 0},
+      "MOY": {"benchmark": 3, "moderate": 2, "high": 0},
+      "EOY": {"benchmark": 3, "moderate": 2, "high": 0}
+    },
+    "4": {
+      "BOY": {"benchmark": 3, "moderate": 2, "high": 0},
+      "MOY": {"benchmark": 3, "moderate": 2, "high": 0},
+      "EOY": {"benchmark": 4, "moderate": 3, "high": 0}
+    },
+    "5": {
+      "BOY": {"benchmark": 3, "moderate": 2, "high": 0},
+      "MOY": {"benchmark": 4, "moderate": 3, "high": 0},
+      "EOY": {"benchmark": 4, "moderate": 3, "high": 0}
+    },
+    "6": {
+      "BOY": {"benchmark": 3, "moderate": 2, "high": 0},
+      "MOY": {"benchmark": 4, "moderate": 3, "high": 0},
+      "EOY": {"benchmark": 4, "moderate": 3, "high": 0}
+    },
+    "7": {
+      "BOY": {"benchmark": 3, "moderate": 2, "high": 0},
+      "MOY": {"benchmark": 4, "moderate": 3, "high": 0},
+      "EOY": {"benchmark": 4, "moderate": 3, "high": 0}
+    },
+    "8": {
+      "BOY": {"benchmark": 3, "moderate": 2, "high": 0},
+      "MOY": {"benchmark": 4, "moderate": 3, "high": 0},
+      "EOY": {"benchmark": 4, "moderate": 3, "high": 0}
+    }
+  },
   "COMPOSITE": {
     "PreK": {"EOY": {"benchmark": 45, "moderate": 44}},
     "K": {"EOY": {"benchmark": 45, "moderate": 44}},

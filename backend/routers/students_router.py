@@ -211,6 +211,14 @@ def create_group(payload: GroupCreate, db: Session = Depends(get_db), current_us
     return out
 
 
+@router.get("/groups/{group_id}/students", response_model=List[StudentOut])
+def get_group_students(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    group = db.query(Group).filter(Group.id == group_id, Group.owner_id == current_user.id).first()
+    if not group:
+        raise HTTPException(404, "Group not found")
+    return [StudentOut.model_validate(s) for s in group.students]
+
+
 @router.post("/groups/{group_id}/add-students")
 def add_students_to_group(group_id: int, student_ids: List[int], db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     group = db.query(Group).filter(Group.id == group_id, Group.owner_id == current_user.id).first()
@@ -222,3 +230,14 @@ def add_students_to_group(group_id: int, student_ids: List[int], db: Session = D
             group.students.append(s)
     db.commit()
     return {"added": len(students)}
+
+
+@router.delete("/groups/{group_id}")
+def delete_group(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    group = db.query(Group).filter(Group.id == group_id, Group.owner_id == current_user.id).first()
+    if not group:
+        raise HTTPException(404, "Group not found")
+    group.students = []
+    db.delete(group)
+    db.commit()
+    return {"deleted": True}

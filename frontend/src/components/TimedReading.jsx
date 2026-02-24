@@ -34,11 +34,22 @@ export default function TimedReading({ passage, title, onComplete }) {
 
   useEffect(() => () => clearInterval(timerRef.current), []);
 
+  const [discontinued, setDiscontinued] = useState(false);
+
   const toggleError = useCallback((idx) => {
     if (phase !== 'running' && phase !== 'mark_last_word' && phase !== 'review') return;
     setMarkedErrors(prev => {
       const next = new Set(prev);
       if (next.has(idx)) next.delete(idx); else next.add(idx);
+      if (phase === 'running') {
+        const errorsInFirst10 = [...next].filter(i => i < 10).length;
+        if (errorsInFirst10 >= 7) {
+          clearInterval(timerRef.current);
+          setDiscontinued(true);
+          setLastWordIndex(Math.max(0, ...[...next].filter(i => i < 10)));
+          setPhase('review');
+        }
+      }
       return next;
     });
   }, [phase]);
@@ -132,6 +143,12 @@ export default function TimedReading({ passage, title, onComplete }) {
           })}
         </div>
       </div>
+
+      {discontinued && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+          <strong>Discontinued:</strong> The student made 7 or more errors in the first 10 words. Ask the student to stop reading.
+        </div>
+      )}
 
       {/* Results */}
       {phase === 'review' && results && (

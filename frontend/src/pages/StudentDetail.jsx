@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import { ArrowLeft, ClipboardList, TrendingUp, AlertTriangle, Edit3, Archive, RotateCcw, Plus, X, Save } from 'lucide-react';
+import { ArrowLeft, ClipboardList, TrendingUp, AlertTriangle, Edit3, Archive, RotateCcw, Plus, X, Save, Pencil, Play, Clock } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
@@ -94,6 +94,9 @@ export default function StudentDetail() {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [showAddScore, setShowAddScore] = useState(false);
+  const [benchmarks, setBenchmarks] = useState(null);
+  const [editingScore, setEditingScore] = useState(null);
+  const [editScoreVal, setEditScoreVal] = useState('');
 
   const reload = () => {
     Promise.all([
@@ -111,8 +114,9 @@ export default function StudentDetail() {
       api.getStudent(id),
       api.getStudentHistory(id),
       api.studentProgress(id),
+      api.getBenchmarks(),
     ])
-      .then(([s, h, p]) => { setStudent(s); setHistory(h); setProgress(p); })
+      .then(([s, h, p, bm]) => { setStudent(s); setHistory(h); setProgress(p); setBenchmarks(bm); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [id]);
@@ -244,14 +248,18 @@ export default function StudentDetail() {
             <TrendingUp className="w-5 h-5 text-primary-600" /> Progress Over Time
           </h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {Object.entries(subtestGroups).map(([key, points]) => (
+            {Object.entries(subtestGroups).map(([key, points]) => {
+              const bmKey = key;
+              const bmData = benchmarks?.[bmKey];
+              const bmVal = bmData?.[student?.grade]?.BOY?.benchmark || bmData?.[student?.grade]?.MOY?.benchmark;
+              return (
               <div key={key} className="border border-gray-100 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-gray-700 mb-3">
                   {formatComboLabel(key)}
                 </h3>
                 <div className="h-48">
                   <ResponsiveContainer>
-                    <LineChart data={points.map((p, i) => ({
+                    <LineChart data={points.map((p) => ({
                       name: `${p.time_of_year} ${p.academic_year}`,
                       score: p.raw_score,
                     }))}>
@@ -259,12 +267,14 @@ export default function StudentDetail() {
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
                       <Tooltip />
+                      {bmVal && <ReferenceLine y={bmVal} stroke="#22c55e" strokeDasharray="6 3" label={{ value: 'Benchmark', position: 'right', fontSize: 10, fill: '#22c55e' }} />}
                       <Line type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -292,9 +302,27 @@ export default function StudentDetail() {
                       {session.time_of_year} {session.academic_year} | Grade {session.grade_at_test}
                     </span>
                   </div>
-                  <span className="text-xs text-gray-400">
-                    {new Date(session.completed_at || session.created_at).toLocaleDateString()}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    {session.has_audio && (
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => {
+                          const audio = new Audio(`/api/assessments/${session.id}/audio`);
+                          audio.play().catch(() => {});
+                        }} className="p-1 rounded hover:bg-blue-50 text-blue-500 hover:text-blue-700" title="Play recording">
+                          <Play className="w-3.5 h-3.5" />
+                        </button>
+                        {session.audio_expires_at && (
+                          <span className="text-[10px] text-gray-400 flex items-center gap-0.5" title={`Expires: ${new Date(session.audio_expires_at).toLocaleDateString()}`}>
+                            <Clock className="w-3 h-3" />
+                            {new Date(session.audio_expires_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <span className="text-xs text-gray-400">
+                      {new Date(session.completed_at || session.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
                 {session.scores.length > 0 && (
                   <div className="flex flex-wrap gap-2">
@@ -304,11 +332,28 @@ export default function StudentDetail() {
                           {formatTarget(score.target)}
                           {score.sub_target && ` (${score.sub_target})`}
                         </span>
-                        <span className="text-sm font-bold text-gray-900">{score.raw_score ?? '—'}</span>
-                        {score.risk_level && (
-                          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${RISK_BADGE[score.risk_level] || 'bg-gray-100 text-gray-500'}`}>
-                            {score.risk_level}
-                          </span>
+                        {editingScore === score.id ? (
+                          <>
+                            <input type="number" value={editScoreVal} onChange={(e) => setEditScoreVal(e.target.value)}
+                              className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-sm" autoFocus />
+                            <button onClick={async () => {
+                              await api.editScore(session.id, score.id, { raw_score: Number(editScoreVal) });
+                              setEditingScore(null);
+                              reload();
+                            }} className="text-green-600 hover:text-green-800"><Save className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => setEditingScore(null)} className="text-gray-400 hover:text-gray-600"><X className="w-3.5 h-3.5" /></button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-sm font-bold text-gray-900">{score.raw_score ?? '—'}</span>
+                            {score.risk_level && (
+                              <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${RISK_BADGE[score.risk_level] || 'bg-gray-100 text-gray-500'}`}>
+                                {score.risk_level}
+                              </span>
+                            )}
+                            <button onClick={() => { setEditingScore(score.id); setEditScoreVal(String(score.raw_score ?? '')); }}
+                              className="p-0.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600"><Pencil className="w-3 h-3" /></button>
+                          </>
                         )}
                       </div>
                     ))}

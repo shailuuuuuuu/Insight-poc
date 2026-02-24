@@ -10,6 +10,7 @@ import Assess from './pages/Assess';
 import Reports from './pages/Reports';
 import UsersAdmin from './pages/UsersAdmin';
 import Licenses from './pages/Licenses';
+import StudentReadingMode from './pages/StudentReadingMode';
 
 function ProtectedRoute({ children }) {
   const { user } = useAuth();
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/users" element={<UsersAdmin />} />
             <Route path="/licenses" element={<Licenses />} />
           </Route>
+          <Route path="/student-reading" element={<ProtectedRoute><StudentReadingMode /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

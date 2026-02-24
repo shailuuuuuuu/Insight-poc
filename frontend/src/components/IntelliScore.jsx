@@ -31,6 +31,43 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
     };
   }, [audioUrl]);
 
+  const [micTested, setMicTested] = useState(false);
+  const [micLevel, setMicLevel] = useState(0);
+  const micTestRef = useRef(null);
+
+  const testMicrophone = async () => {
+    setError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioCtx = new AudioContext();
+      const analyser = audioCtx.createAnalyser();
+      const source = audioCtx.createMediaStreamSource(stream);
+      source.connect(analyser);
+      analyser.fftSize = 256;
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      let maxLevel = 0;
+      micTestRef.current = setInterval(() => {
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a, b) => a + b, 0) / data.length;
+        const norm = Math.min(100, Math.round(avg * 2));
+        setMicLevel(norm);
+        if (norm > maxLevel) maxLevel = norm;
+      }, 100);
+      setTimeout(() => {
+        clearInterval(micTestRef.current);
+        stream.getTracks().forEach(t => t.stop());
+        audioCtx.close();
+        setMicTested(true);
+        setMicLevel(0);
+        if (maxLevel < 5) {
+          setError('Microphone detected but no audio input. Check your mic settings.');
+        }
+      }, 3000);
+    } catch {
+      setError('Microphone access denied. Please allow microphone access.');
+    }
+  };
+
   const startRecording = async () => {
     setError('');
     try {
@@ -182,6 +219,29 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
                   <p className="text-sm text-gray-500">
                     Record the student's oral narrative retell. The audio will be transcribed and analyzed for narrative complexity.
                   </p>
+
+                  {!micTested && (
+                    <div className="space-y-2">
+                      <button onClick={testMicrophone}
+                        className="mx-auto flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
+                        <Mic className="w-4 h-4" /> Test Microphone
+                      </button>
+                      {micLevel > 0 && (
+                        <div className="flex items-center gap-2 justify-center">
+                          <span className="text-xs text-gray-500">Level:</span>
+                          <div className="w-32 bg-gray-200 rounded-full h-2">
+                            <div className="h-2 rounded-full bg-green-500 transition-all" style={{ width: `${micLevel}%` }} />
+                          </div>
+                          <span className="text-xs text-gray-600">{micLevel}%</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {micTested && (
+                    <div className="text-xs text-green-600 font-medium">Microphone working</div>
+                  )}
+
                   <button
                     onClick={startRecording}
                     className="mx-auto w-20 h-20 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center transition-colors shadow-lg"

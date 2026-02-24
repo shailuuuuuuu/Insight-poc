@@ -19,6 +19,7 @@ def risk_summary(
     grade: Optional[str] = None,
     school: Optional[str] = None,
     group_id: Optional[int] = None,
+    examiner_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -29,7 +30,7 @@ def risk_summary(
         return []
 
     if group_id:
-        group = db.query(Group).filter(Group.id == group_id, Group.user_id == current_user.id).first()
+        group = db.query(Group).filter(Group.id == group_id, Group.owner_id == current_user.id).first()
         if group:
             group_student_ids = set(s.id for s in group.students)
             my_student_ids = [sid for sid in my_student_ids if sid in group_student_ids]
@@ -54,19 +55,32 @@ def risk_summary(
         q = q.filter(TestSession.time_of_year == time_of_year)
     if grade:
         q = q.filter(TestSession.grade_at_test == grade)
+    if examiner_id:
+        q = q.filter(TestSession.examiner_id == examiner_id)
 
-    subtests = {}
+    # Build per-student, per-subtest risk: keep the latest score per student
+    # so counts match unique students (consistent with student_risk_table)
+    student_risks = {}  # { student_id: { subtest_key: risk_level } }
     for score, session in q.all():
         key = f"{session.subtest}_{score.target}"
-        if key not in subtests:
-            subtests[key] = {"total": 0, "benchmark": 0, "moderate": 0, "high": 0}
-        subtests[key]["total"] += 1
-        if score.risk_level in ("benchmark", "advanced"):
-            subtests[key]["benchmark"] += 1
-        elif score.risk_level == "moderate":
-            subtests[key]["moderate"] += 1
-        elif score.risk_level == "high":
-            subtests[key]["high"] += 1
+        student_id = session.student_id
+        if student_id not in student_risks:
+            student_risks[student_id] = {}
+        student_risks[student_id][key] = score.risk_level
+
+    # Aggregate unique students per subtest per risk level
+    subtests = {}
+    for student_id, risks in student_risks.items():
+        for key, risk_level in risks.items():
+            if key not in subtests:
+                subtests[key] = {"total": 0, "benchmark": 0, "moderate": 0, "high": 0}
+            subtests[key]["total"] += 1
+            if risk_level in ("benchmark", "advanced"):
+                subtests[key]["benchmark"] += 1
+            elif risk_level == "moderate":
+                subtests[key]["moderate"] += 1
+            elif risk_level == "high":
+                subtests[key]["high"] += 1
 
     results = []
     for subtest, counts in subtests.items():
@@ -94,6 +108,7 @@ def student_risk_table(
     school: Optional[str] = None,
     group_id: Optional[int] = None,
     risk_filter: Optional[str] = None,
+    examiner_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -104,7 +119,7 @@ def student_risk_table(
         return []
 
     if group_id:
-        group = db.query(Group).filter(Group.id == group_id, Group.user_id == current_user.id).first()
+        group = db.query(Group).filter(Group.id == group_id, Group.owner_id == current_user.id).first()
         if group:
             group_student_ids = set(s.id for s in group.students)
             my_student_ids = [sid for sid in my_student_ids if sid in group_student_ids]
@@ -127,6 +142,8 @@ def student_risk_table(
             q = q.filter(TestSession.academic_year == academic_year)
         if time_of_year:
             q = q.filter(TestSession.time_of_year == time_of_year)
+        if examiner_id:
+            q = q.filter(TestSession.examiner_id == examiner_id)
 
         risk_data = {}
         for score, session in q.all():
@@ -208,6 +225,39 @@ def export_report(
                     session.grade_at_test, session.subtest, score.target,
                     score.raw_score, score.max_score,
                 ])
+    elif report_type == "risk_by_grade":
+        writer.writerow(["Grade", "School", "Subtest_Target", "Total", "Benchmark", "Moderate", "High Risk",
+                          "Benchmark %", "Moderate %", "High Risk %"])
+        # Build per-student latest risk, then aggregate by grade/school
+        student_latest = {}  # { (student_id, grade, school, subtest_target): risk_level }
+        for session in sessions:
+            student = session.student
+            for score in session.scores:
+                sk = (student.id, session.grade_at_test, student.school or "Unknown", f"{session.subtest}_{score.target}")
+                student_latest[sk] = score.risk_level
+        agg = {}
+        for (_, grade, school_name, subtest_target), risk_level in student_latest.items():
+            key = (grade, school_name, subtest_target)
+            if key not in agg:
+                agg[key] = {"total": 0, "bm": 0, "mod": 0, "high": 0}
+            agg[key]["total"] += 1
+            if risk_level in ("benchmark", "advanced"):
+                agg[key]["bm"] += 1
+            elif risk_level == "moderate":
+                agg[key]["mod"] += 1
+            elif risk_level == "high":
+                agg[key]["high"] += 1
+        for (grade, school_name, subtest_target), counts in sorted(agg.items()):
+            t = counts["total"]
+            if t == 0:
+                continue
+            writer.writerow([
+                grade, school_name, subtest_target, t,
+                counts["bm"], counts["mod"], counts["high"],
+                round(counts["bm"] / t * 100, 1),
+                round(counts["mod"] / t * 100, 1),
+                round(counts["high"] / t * 100, 1),
+            ])
     else:
         writer.writerow(["Error"])
         writer.writerow(["Unknown report type"])

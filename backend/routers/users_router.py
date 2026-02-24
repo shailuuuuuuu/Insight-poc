@@ -55,6 +55,23 @@ def create_user(
     return UserOut.model_validate(user)
 
 
+@router.put("/org-settings")
+def update_org_settings_route(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    from models import Organization
+    org = db.query(Organization).filter(Organization.id == current_user.organization_id).first()
+    if not org:
+        raise HTTPException(404, "Organization not found")
+    if "intelliscore_enabled" in payload:
+        org.intelliscore_enabled = payload["intelliscore_enabled"]
+    db.commit()
+    return {"intelliscore_enabled": org.intelliscore_enabled}
+
+
 @router.put("/{user_id}", response_model=UserOut)
 def update_user(
     user_id: int,

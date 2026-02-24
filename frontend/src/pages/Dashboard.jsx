@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { Users, ClipboardList, AlertTriangle, TrendingUp, ChevronRight } from 'lucide-react';
+import { Users, ClipboardList, AlertTriangle, TrendingUp, ChevronRight, ExternalLink } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const RISK_COLORS = { benchmark: '#22c55e', moderate: '#f59e0b', high: '#ef4444' };
+const RISK_KEYS = { Benchmark: 'benchmark', Moderate: 'moderate', High: 'high' };
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -27,14 +28,27 @@ export default function Dashboard() {
   const totalStudents = myStudents.length;
   const totalAssessments = riskData.reduce((sum, r) => sum + r.total_students, 0);
   const atRisk = riskData.reduce((sum, r) => sum + r.high_risk + r.moderate_risk, 0);
+  const benchmarkCount = riskData.reduce((sum, r) => sum + r.low_risk, 0);
+  const moderateCount = riskData.reduce((sum, r) => sum + r.moderate_risk, 0);
+  const highCount = riskData.reduce((sum, r) => sum + r.high_risk, 0);
 
   const overallPie = riskData.length > 0
     ? [
-        { name: 'Benchmark', value: riskData.reduce((s, r) => s + r.low_risk, 0), color: RISK_COLORS.benchmark },
-        { name: 'Moderate', value: riskData.reduce((s, r) => s + r.moderate_risk, 0), color: RISK_COLORS.moderate },
-        { name: 'High', value: riskData.reduce((s, r) => s + r.high_risk, 0), color: RISK_COLORS.high },
+        { name: 'Benchmark', value: benchmarkCount, color: RISK_COLORS.benchmark },
+        { name: 'Moderate', value: moderateCount, color: RISK_COLORS.moderate },
+        { name: 'High', value: highCount, color: RISK_COLORS.high },
       ].filter((d) => d.value > 0)
     : [];
+
+  const handlePieClick = (data) => {
+    if (data?.name) {
+      const riskKey = RISK_KEYS[data.name];
+      if (riskKey) {
+        const firstSubtest = riskData[0]?.subtest || '';
+        navigate(`/reports?tab=table&riskFilter=${firstSubtest}:${riskKey}`);
+      }
+    }
+  };
 
   if (loading) {
     return (
@@ -58,31 +72,52 @@ export default function Dashboard() {
         <StatCard
           icon={Users} label="My Students" value={totalStudents}
           color="bg-blue-50 text-blue-600" onClick={() => navigate('/students')}
+          subtitle={`${myStudents.filter(s => s.status === 'active').length} active`}
         />
         <StatCard
           icon={ClipboardList} label="Assessments" value={totalAssessments}
           color="bg-green-50 text-green-600" onClick={() => navigate('/reports')}
+          subtitle={riskData.length > 0 ? `across ${riskData.length} subtests` : null}
         />
         <StatCard
           icon={AlertTriangle} label="At Risk" value={atRisk}
           color="bg-amber-50 text-amber-600" onClick={() => navigate('/reports')}
+          subtitle={atRisk > 0 ? <span><span className="text-amber-600">{moderateCount} moderate</span> · <span className="text-red-600">{highCount} high</span></span> : null}
         />
         <StatCard
           icon={TrendingUp} label="Subtests Tracked" value={riskData.length}
           color="bg-purple-50 text-purple-600" onClick={() => navigate('/reports')}
+          subtitle={benchmarkCount > 0 ? `${benchmarkCount} at benchmark` : null}
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Risk Distribution */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Overall Risk Distribution</h2>
+          <button
+            onClick={() => navigate('/reports')}
+            className="flex items-center gap-2 group mb-4 w-full text-left"
+          >
+            <h2 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+              Overall Risk Distribution
+            </h2>
+            <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors" />
+          </button>
           {overallPie.length > 0 ? (
             <div className="flex items-center gap-6">
               <div className="w-48 h-48">
                 <ResponsiveContainer>
                   <PieChart>
-                    <Pie data={overallPie} dataKey="value" cx="50%" cy="50%" innerRadius={40} outerRadius={70}>
+                    <Pie
+                      data={overallPie}
+                      dataKey="value"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={70}
+                      style={{ cursor: 'pointer' }}
+                      onClick={(_, index) => handlePieClick(overallPie[index])}
+                    >
                       {overallPie.map((d, i) => (
                         <Cell key={i} fill={d.color} />
                       ))}
@@ -91,15 +126,25 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="space-y-3">
-                {overallPie.map((d) => (
-                  <div key={d.name} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }} />
-                    <span className="text-sm text-gray-600">
-                      {d.name}: <span className="font-semibold">{d.value}</span>
-                    </span>
-                  </div>
-                ))}
+              <div className="space-y-2">
+                {overallPie.map((d) => {
+                  const riskKey = RISK_KEYS[d.name];
+                  const firstSubtest = riskData[0]?.subtest || '';
+                  return (
+                    <button
+                      key={d.name}
+                      onClick={() => navigate(`/reports?tab=table&riskFilter=${firstSubtest}:${riskKey}`)}
+                      className="flex items-center gap-2 w-full text-left hover:bg-gray-50 rounded-lg px-2 py-1.5 transition-colors group"
+                    >
+                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                      <span className="text-sm text-gray-600 group-hover:text-gray-900 flex-1">
+                        {d.name}
+                      </span>
+                      <span className="text-sm font-bold text-gray-900">{d.value}</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-primary-600 transition-colors" />
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ) : (
@@ -121,13 +166,64 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Risk by Subtest — clickable cards */}
+      {riskData.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <button
+            onClick={() => navigate('/reports')}
+            className="flex items-center gap-2 group mb-4 w-full text-left"
+          >
+            <h2 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+              Risk by Subtest
+            </h2>
+            <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors" />
+          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {riskData.map((r) => (
+              <button
+                key={r.subtest}
+                onClick={() => navigate(`/reports?tab=table&riskFilter=${r.subtest}:high`)}
+                className="text-left p-4 rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all group"
+              >
+                <p className="text-sm font-semibold text-gray-900 group-hover:text-primary-600 truncate">
+                  {r.subtest.replace(/_/g, ' ')}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">{r.total_students} assessed</p>
+                <div className="flex items-center gap-3 mt-3">
+                  <span className="flex items-center gap-1 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-green-500" />
+                    <span className="font-medium text-gray-700">{r.low_risk}</span>
+                  </span>
+                  <span className="flex items-center gap-1 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span className="font-medium text-gray-700">{r.moderate_risk}</span>
+                  </span>
+                  <span className="flex items-center gap-1 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-red-500" />
+                    <span className="font-medium text-gray-700">{r.high_risk}</span>
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Recent Students */}
       {myStudents.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">My Students</h2>
-            <button onClick={() => navigate('/students')} className="text-primary-600 text-sm hover:underline">
-              View all
+            <button
+              onClick={() => navigate('/students')}
+              className="flex items-center gap-2 group"
+            >
+              <h2 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+                My Students
+              </h2>
+              <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors" />
+            </button>
+            <button onClick={() => navigate('/students')} className="text-primary-600 text-sm hover:underline flex items-center gap-1">
+              View all <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
           <div className="overflow-x-auto">
@@ -143,8 +239,12 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {myStudents.slice(0, 5).map((s) => (
-                  <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-3 font-medium text-gray-900">{s.last_name}, {s.first_name}</td>
+                  <tr
+                    key={s.id}
+                    className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
+                    onClick={() => navigate(`/students/${s.id}`)}
+                  >
+                    <td className="py-3 font-medium text-gray-900 hover:text-primary-600">{s.last_name}, {s.first_name}</td>
                     <td className="py-3 text-gray-600">{s.grade}</td>
                     <td className="py-3 text-gray-600">{s.school || '—'}</td>
                     <td className="py-3">
@@ -155,9 +255,9 @@ export default function Dashboard() {
                       </span>
                     </td>
                     <td className="py-3">
-                      <button onClick={() => navigate(`/students/${s.id}`)} className="text-primary-600 hover:underline text-xs">
-                        View
-                      </button>
+                      <span className="text-primary-600 hover:underline text-xs flex items-center gap-1">
+                        View <ChevronRight className="w-3 h-3" />
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -170,20 +270,22 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ icon: Icon, label, value, color, onClick }) {
+function StatCard({ icon: Icon, label, value, color, onClick, subtitle }) {
   return (
     <button
       onClick={onClick}
-      className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 text-left hover:shadow-md transition-shadow w-full"
+      className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 text-left hover:shadow-md hover:border-primary-200 transition-all w-full group"
     >
       <div className="flex items-center gap-4">
         <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${color}`}>
           <Icon className="w-6 h-6" />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <p className="text-2xl font-bold text-gray-900">{value}</p>
           <p className="text-sm text-gray-500">{label}</p>
+          {subtitle && <p className="text-xs text-gray-400 mt-0.5 truncate">{subtitle}</p>}
         </div>
+        <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-primary-600 transition-colors flex-shrink-0" />
       </div>
     </button>
   );
@@ -193,13 +295,13 @@ function QuickAction({ label, desc, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+      className="w-full flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-primary-200 transition-all group"
     >
       <div className="text-left">
-        <p className="font-medium text-gray-900">{label}</p>
+        <p className="font-medium text-gray-900 group-hover:text-primary-600 transition-colors">{label}</p>
         <p className="text-sm text-gray-500">{desc}</p>
       </div>
-      <ChevronRight className="w-5 h-5 text-gray-400" />
+      <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-primary-600 transition-colors" />
     </button>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { ClipboardList, CheckCircle, AlertTriangle, Wand2, PenLine, BookOpen, Mic, FileText } from 'lucide-react';
@@ -162,8 +162,18 @@ export default function Assess() {
       .finally(() => setLoading(false));
   }, []);
 
+  const [nextSubtestSuggestions, setNextSubtestSuggestions] = useState([]);
+
   const selectedStudentObj = students.find((s) => String(s.id) === String(selectedStudent));
   const selectedSubtestObj = subtests.find((s) => s.id === selectedSubtest);
+
+  useEffect(() => {
+    if (selectedStudent) {
+      api.getNextSubtest(Number(selectedStudent)).then(setNextSubtestSuggestions).catch(() => setNextSubtestSuggestions([]));
+    } else {
+      setNextSubtestSuggestions([]);
+    }
+  }, [selectedStudent]);
 
   const handleStart = async () => {
     if (!selectedStudent || !selectedSubtest) return;
@@ -252,6 +262,19 @@ export default function Assess() {
               ))}
             </select>
           </div>
+
+          {nextSubtestSuggestions.length > 0 && nextSubtestSuggestions[0].subtest && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+              <p className="text-xs font-semibold text-blue-700 uppercase">Recommended Next Subtest</p>
+              {nextSubtestSuggestions.filter(s => s.subtest).map((s, i) => (
+                <button key={i} onClick={() => setSelectedSubtest(s.subtest)}
+                  className="w-full text-left p-2 rounded bg-white border border-blue-200 hover:bg-blue-50 text-sm">
+                  <span className="font-medium text-blue-800">{s.subtest.replace(/_/g, ' ')}</span>
+                  <span className="text-blue-600 text-xs ml-2">— {s.reason}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Subtest</label>
@@ -415,6 +438,16 @@ export default function Assess() {
             <DDMPMFlow scores={scores} setScores={setScores} />
           )}
 
+          {/* Personal Generation */}
+          {selectedSubtest === 'PERSONAL_GENERATION' && scoringMode === 'manual' && (
+            <PersonalGenerationFlow scores={scores} setScores={setScores} />
+          )}
+
+          {/* Dynamic Assessment */}
+          {(selectedSubtest === 'NLM_LISTENING' || selectedSubtest === 'NLM_READING') && scoringMode === 'manual' && (
+            <DynamicAssessmentPanel />
+          )}
+
           {/* Fallback manual entry for any targets not covered by specialized UIs */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
             <h3 className="text-sm font-semibold text-gray-700">Score Summary / Manual Entry</h3>
@@ -572,6 +605,25 @@ function NLMReadingFlow({ grade, timeOfYear, assessmentType, scores, setScores }
         ))}
       </div>
 
+      {/* Student View & PDF buttons */}
+      {story?.passage && (
+        <div className="flex gap-2">
+          <button onClick={() => window.open(`/student-reading?grade=${grade}&toy=${timeOfYear}`, '_blank')}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-sm font-medium hover:bg-blue-100">
+            <BookOpen className="w-3.5 h-3.5" /> Open Student Reading View
+          </button>
+          <button onClick={() => {
+            const win = window.open('', '_blank');
+            win.document.write(`<html><head><title>${story.title || 'Story'}</title><style>body{font-family:serif;font-size:20px;max-width:700px;margin:40px auto;line-height:1.8;padding:20px}h1{text-align:center;font-size:24px;margin-bottom:30px}</style></head><body><h1>${story.title || ''}</h1><p>${story.passage}</p></body></html>`);
+            win.document.close();
+            setTimeout(() => win.print(), 500);
+          }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-700 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-100">
+            <FileText className="w-3.5 h-3.5" /> Download Stimulus PDF
+          </button>
+        </div>
+      )}
+
       {/* Timed Reading Phase */}
       {phase === 'reading' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -675,6 +727,7 @@ function NLMListeningFlow({ grade, scores, setScores }) {
    DDM Orthographic Mapping Flow
    ═══════════════════════════════════════════════════════════════ */
 function DDMOMFlow({ scores, setScores }) {
+  const timeLimits = { IRREGULAR_WORDS: 60, LETTER_SOUNDS: 60, LETTER_NAMES: 120 };
   return (
     <div className="space-y-4">
       {Object.keys(scores).map((target) => {
@@ -684,6 +737,7 @@ function DDMOMFlow({ scores, setScores }) {
           <DDMGridScoring
             key={target}
             target={target}
+            timeLimit={timeLimits[target] || 60}
             onComplete={(result) => {
               setScores(prev => ({ ...prev, [target]: String(result.score) }));
             }}
@@ -752,6 +806,149 @@ function DDMPMFlow({ scores, setScores }) {
           }}
         />
       ))}
+    </div>
+  );
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Personal Generation Flow — Oral story + Written story
+   ═══════════════════════════════════════════════════════════════ */
+function PersonalGenerationFlow({ scores, setScores }) {
+  const [oralText, setOralText] = useState('');
+  const [writtenText, setWrittenText] = useState('');
+  const [oralRecording, setOralRecording] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorder = useRef(null);
+  const chunks = useRef([]);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder.current = new MediaRecorder(stream);
+      chunks.current = [];
+      mediaRecorder.current.ondataavailable = (e) => { if (e.data.size > 0) chunks.current.push(e.data); };
+      mediaRecorder.current.onstop = () => {
+        const blob = new Blob(chunks.current, { type: 'audio/webm' });
+        setOralRecording(URL.createObjectURL(blob));
+        stream.getTracks().forEach(t => t.stop());
+      };
+      mediaRecorder.current.start();
+      setIsRecording(true);
+    } catch { /* mic access denied */ }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder.current?.state === 'recording') {
+      mediaRecorder.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+        <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Mic className="w-4 h-4" /> Oral Story</h3>
+        <p className="text-sm text-gray-500">Ask the student to tell a personal story about something that happened to them. Record or transcribe below.</p>
+        <div className="flex gap-2">
+          {!isRecording ? (
+            <button onClick={startRecording} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 flex items-center gap-1.5">
+              <Mic className="w-4 h-4" /> Record
+            </button>
+          ) : (
+            <button onClick={stopRecording} className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 flex items-center gap-1.5 animate-pulse">
+              Stop Recording
+            </button>
+          )}
+        </div>
+        {oralRecording && <audio src={oralRecording} controls className="w-full mt-2" />}
+        <textarea value={oralText} onChange={(e) => setOralText(e.target.value)} placeholder="Transcribe the oral story here..."
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm h-32 outline-none focus:ring-2 focus:ring-primary-500" />
+        <button onClick={() => setScores(prev => ({ ...prev, ORAL_STORY: oralText ? '1' : '0' }))}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+          Save Oral Story
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+        <h3 className="font-semibold text-gray-900 flex items-center gap-2"><FileText className="w-4 h-4" /> Written Story</h3>
+        <p className="text-sm text-gray-500">Have the student write their personal story. Enter the text below or note a score.</p>
+        <textarea value={writtenText} onChange={(e) => setWrittenText(e.target.value)} placeholder="Enter the student's written story..."
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm h-32 outline-none focus:ring-2 focus:ring-primary-500" />
+        <button onClick={() => setScores(prev => ({ ...prev, WRITTEN_STORY: writtenText ? '1' : '0' }))}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+          Save Written Story
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Dynamic Assessment Panel — Teaching scripts + Responsiveness Scale
+   ═══════════════════════════════════════════════════════════════ */
+function DynamicAssessmentPanel() {
+  const [show, setShow] = useState(false);
+  const [responsiveness, setResponsiveness] = useState(null);
+  const [notes, setNotes] = useState('');
+
+  if (!show) {
+    return (
+      <button onClick={() => setShow(true)}
+        className="w-full text-left bg-purple-50 border border-purple-200 rounded-xl p-4 hover:bg-purple-100 transition-colors">
+        <p className="text-sm font-medium text-purple-800">Dynamic Assessment (Optional)</p>
+        <p className="text-xs text-purple-600 mt-1">Use teaching scripts and rate language responsiveness after intervention questions.</p>
+      </button>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-purple-200 p-6 space-y-5">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-purple-900">Dynamic Assessment</h3>
+        <button onClick={() => setShow(false)} className="text-sm text-gray-500 hover:text-gray-700">Collapse</button>
+      </div>
+
+      <div className="bg-purple-50 rounded-lg p-4 text-sm text-purple-800 space-y-2">
+        <p className="font-semibold">Teaching Script:</p>
+        <ol className="list-decimal ml-4 space-y-1">
+          <li>Ask the inferential question (e.g., "Why did the character feel that way?")</li>
+          <li>If incorrect: Provide a teaching prompt — "Let's look at what happened in the story..."</li>
+          <li>Re-read the relevant section and ask the question again.</li>
+          <li>Rate the student's responsiveness to teaching on the scale below.</li>
+        </ol>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Language Responsiveness Scale</label>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          {[0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4].map(val => (
+            <button key={val} onClick={() => setResponsiveness(val)}
+              className={`py-2 rounded-lg border text-sm font-medium transition-colors ${
+                responsiveness === val ? 'bg-purple-600 text-white border-purple-600' : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}>
+              {val}
+            </button>
+          ))}
+        </div>
+        <div className="flex justify-between text-xs text-gray-500 mt-1 px-1">
+          <span>0 = No response</span>
+          <span>4 = Full transfer</span>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observations about student's response to teaching..."
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm h-20 outline-none focus:ring-2 focus:ring-purple-500" />
+      </div>
+
+      {responsiveness !== null && (
+        <div className="bg-purple-100 rounded-lg p-3 text-sm text-purple-800">
+          Responsiveness Score: <strong>{responsiveness}</strong>/4
+        </div>
+      )}
     </div>
   );
 }
