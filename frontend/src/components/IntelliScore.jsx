@@ -7,7 +7,7 @@ const RECORDING_STATES = { IDLE: 'idle', RECORDING: 'recording' };
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const speechSupported = !!SpeechRecognition;
 
-export default function IntelliScore({ sessionId, onScoresReady }) {
+export default function IntelliScore({ sessionId, subtest, onScoresReady }) {
   const [recState, setRecState] = useState(RECORDING_STATES.IDLE);
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
@@ -262,7 +262,13 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
           <Wand2 className="w-5 h-5 text-white" />
           <div>
             <h3 className="text-white font-semibold">IntelliScore</h3>
-            <p className="text-purple-200 text-xs">AI-Powered Narrative Analysis</p>
+            <p className="text-purple-200 text-xs">
+              {subtest === 'PERSONAL_GENERATION'
+                ? 'AI-Powered Personal Narrative Analysis'
+                : subtest === 'NLM_LISTENING'
+                  ? 'AI-Powered Listening Retell Analysis'
+                  : 'AI-Powered Reading Retell Analysis'}
+            </p>
           </div>
         </div>
       </div>
@@ -501,7 +507,9 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
               rows={8}
-              placeholder={'Type or paste the student\'s narrative retell transcript here...\n\nExample: The story was about a girl named Maya who lost her dog. She was very worried because he ran away. She looked everywhere around the neighborhood and asked her friends to help search. Finally they found him in the park playing with other dogs. Maya was so happy and relieved.'}
+              placeholder={subtest === 'PERSONAL_GENERATION'
+                ? 'Type or paste the student\'s personal narrative here...\n\nExample: One time I went to the park with my mom and I lost my favorite ball. I was really sad because it was my birthday present. I looked behind the swings and under the slide. Finally I found it near the big tree and I was so happy.'
+                : 'Type or paste the student\'s narrative retell transcript here...\n\nExample: The story was about a girl named Maya who lost her dog. She was very worried because he ran away. She looked everywhere around the neighborhood and asked her friends to help search. Finally they found him in the park playing with other dogs. Maya was so happy and relieved.'}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-500 resize-y"
             />
             <div className="flex items-center justify-between">
@@ -556,7 +564,9 @@ export default function IntelliScore({ sessionId, onScoresReady }) {
                     <p className="text-2xl font-bold text-purple-700">
                       {analysis.total_retell_score}/{analysis.max_retell_score}
                     </p>
-                    <p className="text-xs text-purple-500">Retell Score</p>
+                    <p className="text-xs text-purple-500">
+                      {subtest === 'PERSONAL_GENERATION' ? 'Narrative Score' : 'Retell Score'}
+                    </p>
                   </div>
                 </div>
 

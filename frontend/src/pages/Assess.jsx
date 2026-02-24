@@ -326,7 +326,7 @@ export default function Assess() {
             </div>
           </div>
 
-          {/* Scoring Mode — only show for NLM subtests which support IntelliScore */}
+          {/* Scoring Mode — show for NLM subtests and Personal Generation */}
           {selectedSubtestObj?.category === 'NLM' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Scoring Method</label>
@@ -357,7 +357,11 @@ export default function Assess() {
                     <Wand2 className="w-4 h-4 text-purple-600" />
                     <span className="font-medium text-sm text-gray-900">IntelliScore</span>
                   </div>
-                  <p className="text-xs text-gray-500">Record audio, auto-transcribe, and AI-analyze</p>
+                  <p className="text-xs text-gray-500">
+                    {selectedSubtest === 'PERSONAL_GENERATION'
+                      ? 'Record personal narrative, auto-transcribe, and AI-analyze'
+                      : 'Record retell audio, auto-transcribe, and AI-analyze'}
+                  </p>
                 </button>
               </div>
             </div>
@@ -389,48 +393,57 @@ export default function Assess() {
           </div>
 
           {/* IntelliScore Panel */}
-          {scoringMode === 'intelliscore' && session && (
-            <IntelliScore
-              sessionId={session.id}
-              onScoresReady={(analysis) => {
-                if (analysis.sub_scores) {
-                  setScores(prev => {
-                    const updated = { ...prev };
-                    if ('NLM_RETELL' in updated) {
-                      updated['NLM_RETELL'] = String(analysis.total_retell_score);
-                    }
-                    return updated;
-                  });
-                }
-              }}
-            />
-          )}
+          {scoringMode === 'intelliscore' && session && (() => {
+            const intelliScoreTarget = selectedSubtest === 'PERSONAL_GENERATION' ? 'ORAL_STORY' : 'NLM_RETELL';
+            const autoFilledTargets = [intelliScoreTarget];
+            const manualTargets = Object.keys(scores).filter(t => !autoFilledTargets.includes(t));
+            const targetLabel = selectedSubtest === 'PERSONAL_GENERATION' ? 'Oral Story (Narrative)' : 'Retell';
 
-          {/* Manual score entry for targets IntelliScore can't fill */}
-          {scoringMode === 'intelliscore' && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
-              <h3 className="text-sm font-semibold text-gray-700">Additional Scores (Manual Entry)</h3>
-              <p className="text-xs text-gray-500">
-                IntelliScore fills the Retell score automatically. Enter scores for other targets below.
-              </p>
-              <div className="space-y-3">
-                {Object.keys(scores).filter(t => t !== 'NLM_RETELL').map((target) => (
-                  <div key={target} className="flex items-center gap-4">
-                    <label className="w-48 text-sm font-medium text-gray-700">{formatTarget(target)}</label>
-                    <input
-                      type="number"
-                      value={scores[target]}
-                      onChange={(e) => setScores((prev) => ({ ...prev, [target]: e.target.value }))}
-                      placeholder="Score"
-                      min="0"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                    {scores[target] !== '' && <span className="text-green-600 text-xs font-medium">Set</span>}
+            return (
+              <>
+                <IntelliScore
+                  sessionId={session.id}
+                  subtest={selectedSubtest}
+                  onScoresReady={(analysis) => {
+                    if (analysis.sub_scores) {
+                      setScores(prev => {
+                        const updated = { ...prev };
+                        if (intelliScoreTarget in updated) {
+                          updated[intelliScoreTarget] = String(analysis.total_retell_score);
+                        }
+                        return updated;
+                      });
+                    }
+                  }}
+                />
+
+                {manualTargets.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+                    <h3 className="text-sm font-semibold text-gray-700">Additional Scores (Manual Entry)</h3>
+                    <p className="text-xs text-gray-500">
+                      IntelliScore fills the {targetLabel} score automatically. Enter scores for remaining targets below.
+                    </p>
+                    <div className="space-y-3">
+                      {manualTargets.map((target) => (
+                        <div key={target} className="flex items-center gap-4">
+                          <label className="w-48 text-sm font-medium text-gray-700">{formatTarget(target)}</label>
+                          <input
+                            type="number"
+                            value={scores[target]}
+                            onChange={(e) => setScores((prev) => ({ ...prev, [target]: e.target.value }))}
+                            placeholder="Score"
+                            min="0"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500"
+                          />
+                          {scores[target] !== '' && <span className="text-green-600 text-xs font-medium">Set</span>}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                )}
+              </>
+            );
+          })()}
 
           {/* NLM Reading — Stimulus + Timed Reading + Retell + Questions */}
           {selectedSubtest === 'NLM_READING' && scoringMode === 'manual' && (
@@ -466,9 +479,12 @@ export default function Assess() {
             <DDMPMFlow scores={scores} setScores={setScores} />
           )}
 
-          {/* Personal Generation */}
+          {/* Personal Generation — full manual flow, or just written story section when IntelliScore handles oral */}
           {selectedSubtest === 'PERSONAL_GENERATION' && scoringMode === 'manual' && (
             <PersonalGenerationFlow scores={scores} setScores={setScores} />
+          )}
+          {selectedSubtest === 'PERSONAL_GENERATION' && scoringMode === 'intelliscore' && (
+            <WrittenStorySection scores={scores} setScores={setScores} />
           )}
 
           {/* Dynamic Assessment */}
@@ -996,6 +1012,35 @@ function DynamicAssessmentPanel() {
           Responsiveness Score: <strong>{responsiveness}</strong>/4
         </div>
       )}
+    </div>
+  );
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Written Story Section — used when IntelliScore handles Oral Story
+   ═══════════════════════════════════════════════════════════════ */
+function WrittenStorySection({ scores, setScores }) {
+  const [writtenText, setWrittenText] = useState('');
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+      <h3 className="font-semibold text-gray-900 flex items-center gap-2"><FileText className="w-4 h-4" /> Written Story</h3>
+      <p className="text-sm text-gray-500">
+        IntelliScore handles the oral narrative above. Have the student write their personal story below.
+      </p>
+      <textarea
+        value={writtenText}
+        onChange={(e) => setWrittenText(e.target.value)}
+        placeholder="Enter the student's written story..."
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm h-32 outline-none focus:ring-2 focus:ring-primary-500"
+      />
+      <button
+        onClick={() => setScores(prev => ({ ...prev, WRITTEN_STORY: writtenText ? '1' : '0' }))}
+        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+      >
+        Save Written Story
+      </button>
     </div>
   );
 }
